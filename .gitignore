@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+
+# Runtime data
+backend/albums/
+backend/database.db
+backend/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build output
+ios/
+android/
+
+# OS / editor artifacts
+.DS_Store
+*.pem
