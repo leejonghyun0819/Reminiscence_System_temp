@@ -24,6 +24,7 @@ from services.gemini_service import (
     generate_memory_interview,
     generate_memory_interview_batch,
     build_curated_memory_note,
+    generate_memory_book_note,
     detect_memory_mode_batch,
 )
 
@@ -174,6 +175,39 @@ class CurateRequest(BaseModel):
     qaPairs: List[QAPairItem] = Field(
         default_factory=list
     )
+
+
+class NoteSourceItem(BaseModel):
+
+    id: str = Field(
+        min_length=1,
+        max_length=160,
+    )
+
+    mode: Optional[str] = None
+    title: Optional[str] = Field(default="", max_length=240)
+    location: Optional[str] = Field(default="", max_length=320)
+    yearEstimate: Optional[str] = Field(default="", max_length=240)
+    categoryFolder: Optional[str] = Field(default="", max_length=160)
+    sceneDescription: Optional[str] = Field(default="", max_length=4000)
+    remembered: Optional[str] = Field(default="", max_length=6000)
+    unremembered: Optional[str] = Field(default="", max_length=3000)
+    reflection: Optional[str] = Field(default="", max_length=4000)
+
+    interviewAnswers: List[str] = Field(
+        default_factory=list,
+        max_length=30,
+    )
+
+
+class GenerateNoteRequest(BaseModel):
+
+    memories: List[NoteSourceItem] = Field(
+        min_length=1,
+        max_length=6,
+    )
+
+    style: Optional[str] = "warm"
 
 
 # ============================================================
@@ -1004,4 +1038,46 @@ async def curate_memory_note_endpoint(
                 "추억 큐레이션 노트 합성 실패: "
                 f"{type(e).__name__}"
             )
+        )
+
+
+# ============================================================
+# Generated Memory Book Note (Beta)
+# ============================================================
+
+@router.post("/generate-note")
+async def generate_note_endpoint(
+    req: GenerateNoteRequest,
+):
+    selected_style = (
+        req.style
+        if req.style in {"warm", "documentary"}
+        else "warm"
+    )
+
+    print(
+        "📚 [/api/gemini/generate-note 요청] "
+        f"추억 {len(req.memories)}개, "
+        f"문체 {selected_style}"
+    )
+
+    try:
+        return await generate_memory_book_note(
+            memories=[
+                memory.model_dump()
+                for memory in req.memories
+            ],
+            style=selected_style,
+        )
+    except Exception as e:
+        print(
+            "❌ [포토북 노트 생성 라우터 오류] "
+            f"{type(e).__name__}: {repr(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "포토북 노트 생성 실패: "
+                f"{type(e).__name__}"
+            ),
         )

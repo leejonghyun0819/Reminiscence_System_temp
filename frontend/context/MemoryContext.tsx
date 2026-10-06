@@ -31,6 +31,19 @@ export interface CuratedNote {
     reflection: string;
 }
 
+export interface GeneratedBookNote {
+    title: string;
+    subtitle: string;
+    periodSummary: string;
+    placeSummary: string;
+    opening: string;
+    body: string;
+    closing: string;
+    keywords: string[];
+    sourceMemoryIds: string[];
+    style: 'warm' | 'documentary';
+}
+
 export interface InterviewQAItem {
     id: string;
     category: string;
@@ -81,6 +94,7 @@ export interface MemoryItem {
     createdAt?: number;
     interviewData?: InterviewData;
     curatedNote?: CuratedNote;
+    generatedNote?: GeneratedBookNote;
 }
 
 interface MemoryContextType {
@@ -119,6 +133,7 @@ interface MemoryContextType {
 
     addToGeneratedNotes: (memory: MemoryItem) => void;
     addMultipleToGeneratedNotes: (memories: MemoryItem[]) => void;
+    updateGeneratedNote: (id: string, updates: { title: string; story: string }) => void;
     deleteFromGeneratedNotes: (id: string) => void;
     deleteMultipleFromGeneratedNotes: (ids: string[]) => void;
 
@@ -559,6 +574,33 @@ export const MemoryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     };
 
+    const updateGeneratedNote = (id: string, updates: { title: string; story: string }) => {
+        setGeneratedNotes((prev) =>
+            prev.map((note) => {
+                if (note.id !== id) return note;
+
+                return {
+                    ...note,
+                    analysis: {
+                        ...note.analysis,
+                        title: updates.title,
+                        description: updates.story,
+                        storyCaption: updates.story,
+                    },
+                    generatedNote: note.generatedNote
+                        ? {
+                              ...note.generatedNote,
+                              title: updates.title,
+                              opening: '',
+                              body: updates.story,
+                              closing: '',
+                          }
+                        : note.generatedNote,
+                };
+            }),
+        );
+    };
+
     const deleteFromGeneratedNotes = (id: string) => {
         setGeneratedNotes((prev) => prev.filter((n) => n.id !== id));
     };
@@ -650,6 +692,7 @@ export const MemoryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 appendActiveMemories,
                 addToGeneratedNotes,
                 addMultipleToGeneratedNotes,
+                updateGeneratedNote,
                 deleteFromGeneratedNotes,
                 deleteMultipleFromGeneratedNotes,
                 swapAlbumImage,

@@ -1,6 +1,6 @@
-// frontend/features/generate/MagazineBookViewer.tsx
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
+import { Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
 import { MemoryItem } from '../../context/MemoryContext';
 import { MouseDragHorizontalScroll } from '../backup/MouseDragHorizontalScroll';
 
@@ -11,9 +11,9 @@ interface MagazineBookViewerProps {
     isEditing: boolean;
     setIsEditing: (editing: boolean) => void;
     editTitle: string;
-    setEditTitle: (val: string) => void;
+    setEditTitle: (value: string) => void;
     editStory: string;
-    setEditStory: (val: string) => void;
+    setEditStory: (value: string) => void;
     onSaveEdit: () => void;
 }
 
@@ -29,6 +29,9 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
     setEditStory,
     onSaveEdit,
 }) => {
+    const generatedNote = note.generatedNote;
+    const photoCount = note.imageUrls?.length || 0;
+
     return (
         <View style={styles.bookWrapper}>
             <View style={styles.bookHeaderRow}>
@@ -36,6 +39,9 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
                     <Text style={styles.locationTag}>{`📍 ${note.analysis?.location || '장소 미정'}`}</Text>
                     <Text style={styles.yearTag}>{`⏳ ${note.analysis?.yearEstimate || '시기 미정'}`}</Text>
                     {note.categoryFolder ? <Text style={styles.folderTag}>{`📁 ${note.categoryFolder}`}</Text> : null}
+                    {generatedNote ? (
+                        <Text style={styles.sourceTag}>{`${generatedNote.sourceMemoryIds.length}개 추억 연결`}</Text>
+                    ) : null}
                 </View>
 
                 <View style={styles.cardHeaderBtnGroup}>
@@ -59,47 +65,78 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
                     placeholder="추억 제목을 입력하세요"
                 />
             ) : (
-                <Text style={styles.bookMainTitle}>{note.analysis?.title || '제목 없음'}</Text>
+                <>
+                    <Text style={styles.bookMainTitle}>{note.analysis?.title || '제목 없음'}</Text>
+                    {generatedNote?.subtitle ? <Text style={styles.bookSubtitle}>{generatedNote.subtitle}</Text> : null}
+                </>
             )}
 
             <View style={styles.mainPhotoBox}>
-                {note.imageUrls && note.imageUrls.length > 0 ? (
+                {photoCount > 0 ? (
                     <Image
                         source={{ uri: note.imageUrls[activePhotoIdx] }}
                         style={styles.mainPhotoImage}
                         resizeMode="contain"
                     />
-                ) : null}
-                <Text style={styles.photoCounterBadge}>{`${activePhotoIdx + 1} / ${note.imageUrls?.length || 0}`}</Text>
+                ) : (
+                    <View style={styles.noPhotoBox}>
+                        <Text style={styles.noPhotoIcon}>📷</Text>
+                        <Text style={styles.noPhotoText}>연결된 사진이 없습니다.</Text>
+                    </View>
+                )}
+                <Text style={styles.photoCounterBadge}>{`${photoCount > 0 ? activePhotoIdx + 1 : 0} / ${photoCount}`}</Text>
             </View>
 
-            <View style={styles.thumbStripWrapper}>
-                <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                    {note.imageUrls?.map((url: string, idx: number) => (
-                        <TouchableOpacity
-                            key={idx}
-                            onPress={() => setActivePhotoIdx(idx)}
-                            style={[styles.thumbItem, activePhotoIdx === idx && styles.thumbItemActive]}
-                        >
-                            <Image source={{ uri: url }} style={styles.thumbImg} />
-                            <Text style={styles.thumbNumberBadge}>{`${idx + 1}`}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </MouseDragHorizontalScroll>
-            </View>
+            {photoCount > 0 ? (
+                <View style={styles.thumbStripWrapper}>
+                    <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                        {note.imageUrls.map((url, index) => (
+                            <TouchableOpacity
+                                key={`${url}-${index}`}
+                                onPress={() => setActivePhotoIdx(index)}
+                                style={[styles.thumbItem, activePhotoIdx === index && styles.thumbItemActive]}
+                            >
+                                <Image source={{ uri: url }} style={styles.thumbImg} />
+                                <Text style={styles.thumbNumberBadge}>{index + 1}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </MouseDragHorizontalScroll>
+                </View>
+            ) : null}
 
             <View style={styles.sectionDivider} />
 
             <View style={styles.storySection}>
-                <Text style={styles.storySectionTitle}>📖 그날의 이야기</Text>
+                <Text style={styles.storySectionTitle}>
+                    {generatedNote ? '✨ AI가 엮은 이야기' : '📖 그날의 이야기'}
+                </Text>
+
                 {isEditing ? (
                     <TextInput
                         style={styles.editStoryInput}
                         value={editStory}
                         onChangeText={setEditStory}
                         multiline
-                        placeholder="마음을 울리는 따뜻한 추억 이야기를 적어주세요"
+                        placeholder="추억 이야기를 적어주세요"
                     />
+                ) : generatedNote ? (
+                    <View style={styles.generatedStory}>
+                        {generatedNote.opening ? <Text style={styles.openingText}>{generatedNote.opening}</Text> : null}
+                        <Text style={styles.storyContentText}>{generatedNote.body}</Text>
+                        {generatedNote.closing ? (
+                            <View style={styles.closingBox}>
+                                <Text style={styles.closingLabel}>마지막 페이지</Text>
+                                <Text style={styles.closingText}>{generatedNote.closing}</Text>
+                            </View>
+                        ) : null}
+                        {generatedNote.keywords.length > 0 ? (
+                            <View style={styles.keywordRow}>
+                                {generatedNote.keywords.map((keyword) => (
+                                    <Text key={keyword} style={styles.keywordTag}>{`#${keyword}`}</Text>
+                                ))}
+                            </View>
+                        ) : null}
+                    </View>
                 ) : (
                     <Text style={styles.storyContentText}>
                         {note.analysis?.storyCaption || note.analysis?.description || ''}
@@ -110,7 +147,7 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
             {note.analysis?.audioTranscriptSummary ? (
                 <View style={styles.audioVoiceBox}>
                     <Text style={styles.audioVoiceTitle}>🎙️ 그날의 음성 기록</Text>
-                    <Text style={styles.audioVoiceContent}>{`"${note.analysis.audioTranscriptSummary}"`}</Text>
+                    <Text style={styles.audioVoiceContent}>{`“${note.analysis.audioTranscriptSummary}”`}</Text>
                 </View>
             ) : null}
         </View>
@@ -119,12 +156,12 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
 
 const styles = StyleSheet.create({
     bookWrapper: {
-        maxWidth: 820,
+        maxWidth: 860,
         width: '100%',
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
         padding: 36,
-        shadowColor: '#000',
+        shadowColor: '#0F172A',
         shadowOpacity: 0.08,
         shadowRadius: 16,
         shadowOffset: { width: 0, height: 6 },
@@ -137,7 +174,7 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         gap: 10,
     },
-    tagGroup: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    tagGroup: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
     locationTag: {
         backgroundColor: '#F1F5F9',
         paddingHorizontal: 10,
@@ -165,6 +202,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#B45309',
     },
+    sourceTag: {
+        backgroundColor: '#DBEAFE',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#1D4ED8',
+    },
     cardHeaderBtnGroup: { flexDirection: 'row', gap: 8 },
     editBtn: {
         backgroundColor: '#F1F5F9',
@@ -175,20 +221,22 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     editBtnText: { fontSize: 12, fontWeight: '700', color: '#334155' },
-    saveBtn: {
-        backgroundColor: '#16A34A',
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
+    saveBtn: { backgroundColor: '#16A34A', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },
     saveBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
     bookMainTitle: {
-        fontSize: 26,
+        fontSize: 28,
         fontWeight: '900',
-        color: '#1E293B',
+        color: '#172554',
         textAlign: 'center',
+        lineHeight: 37,
+    },
+    bookSubtitle: {
+        marginTop: 8,
         marginBottom: 24,
-        lineHeight: 34,
+        fontSize: 14,
+        lineHeight: 21,
+        color: '#64748B',
+        textAlign: 'center',
     },
     editTitleInput: {
         fontSize: 22,
@@ -196,7 +244,7 @@ const styles = StyleSheet.create({
         color: '#1E293B',
         textAlign: 'center',
         borderBottomWidth: 2,
-        borderBottomColor: '#F5933C',
+        borderBottomColor: '#2563EB',
         paddingBottom: 6,
         marginBottom: 24,
     },
@@ -211,6 +259,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     mainPhotoImage: { width: '100%', height: '100%' },
+    noPhotoBox: { alignItems: 'center', gap: 7 },
+    noPhotoIcon: { fontSize: 36 },
+    noPhotoText: { color: '#CBD5E1', fontSize: 12 },
     photoCounterBadge: {
         position: 'absolute',
         bottom: 12,
@@ -233,7 +284,7 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#E2E8F0',
     },
-    thumbItemActive: { borderColor: '#F5933C' },
+    thumbItemActive: { borderColor: '#2563EB' },
     thumbImg: { width: '100%', height: '100%' },
     thumbNumberBadge: {
         position: 'absolute',
@@ -246,14 +297,43 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         fontWeight: '700',
     },
-    sectionDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 28 },
-    storySection: { gap: 12 },
-    storySectionTitle: { fontSize: 18, fontWeight: '800', color: '#7E22CE' },
+    sectionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 28 },
+    storySection: { gap: 13 },
+    storySectionTitle: { fontSize: 18, fontWeight: '900', color: '#1D4ED8' },
+    generatedStory: { gap: 18 },
+    openingText: {
+        fontSize: 16,
+        color: '#334155',
+        lineHeight: 29,
+        fontWeight: '700',
+        fontFamily: Platform.OS === 'web' ? 'Georgia, serif' : undefined,
+    },
     storyContentText: {
         fontSize: 15,
         color: '#334155',
-        lineHeight: 28,
+        lineHeight: 29,
         fontFamily: Platform.OS === 'web' ? 'Georgia, serif' : undefined,
+    },
+    closingBox: {
+        marginTop: 4,
+        padding: 17,
+        backgroundColor: '#EFF6FF',
+        borderLeftWidth: 4,
+        borderLeftColor: '#2563EB',
+        borderRadius: 8,
+        gap: 6,
+    },
+    closingLabel: { fontSize: 11, fontWeight: '900', color: '#1D4ED8' },
+    closingText: { fontSize: 14, color: '#334155', lineHeight: 24 },
+    keywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    keywordTag: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#475569',
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 999,
     },
     editStoryInput: {
         fontSize: 15,
@@ -263,7 +343,7 @@ const styles = StyleSheet.create({
         borderColor: '#CBD5E1',
         borderRadius: 8,
         padding: 14,
-        height: 160,
+        height: 220,
         textAlignVertical: 'top',
         backgroundColor: '#F8FAFC',
     },

@@ -52,6 +52,35 @@ export interface CuratedNoteData {
     reflection: string;
 }
 
+export type GeneratedNoteStyle = 'warm' | 'documentary';
+
+export interface GeneratedNoteSourceItem {
+    id: string;
+    mode?: MemoryMode;
+    title?: string;
+    location?: string;
+    yearEstimate?: string;
+    categoryFolder?: string;
+    sceneDescription?: string;
+    remembered?: string;
+    unremembered?: string;
+    reflection?: string;
+    interviewAnswers?: string[];
+}
+
+export interface GeneratedMemoryBookNote {
+    title: string;
+    subtitle: string;
+    periodSummary: string;
+    placeSummary: string;
+    opening: string;
+    body: string;
+    closing: string;
+    keywords: string[];
+    sourceMemoryIds: string[];
+    style: GeneratedNoteStyle;
+}
+
 const BASE_URL = 'http://localhost:8000';
 
 async function getErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -156,7 +185,25 @@ export async function buildCuratedMemoryNote(
     return await response.json();
 }
 
-// 5. 사진 전체의 모드와 사진별 분석 단서를 함께 반환
+// 5. 완성된 추억 기록 여러 개를 한 편의 포토북 노트로 합성
+export async function generateMemoryBookNote(
+    memories: GeneratedNoteSourceItem[],
+    style: GeneratedNoteStyle = 'warm',
+): Promise<GeneratedMemoryBookNote> {
+    const response = await fetch(`${BASE_URL}/api/gemini/generate-note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memories, style }),
+    });
+
+    if (!response.ok) {
+        throw new Error(await getErrorMessage(response, '포토북 노트를 생성하지 못했습니다.'));
+    }
+
+    return await response.json();
+}
+
+// 6. 사진 전체의 모드와 사진별 분석 단서를 함께 반환
 export async function detectMemoryMode(
     images: Array<{ base64: string; mimeType: string }>,
 ): Promise<ModeDetectionResult> {

@@ -25,11 +25,13 @@ from config import (
 from prompts.gemini_prompts import (
     INTERVIEW_GENERATION_PROMPT,
     CURATION_SYNTHESIS_PROMPT,
+    NOTE_GENERATION_PROMPT,
     PHOTO_VOTING_CLASSIFY_PROMPT,
     TRAVEL_ANALYSIS_PROMPT,
     build_travel_analysis_user_prompt,
     build_new_interview_user_prompt,
     build_curation_user_prompt,
+    build_note_generation_user_prompt,
     build_photo_classification_user_prompt,
     build_existing_album_interview_user_prompt,
 )
@@ -121,6 +123,18 @@ class CuratedNoteResponse(BaseModel):
     remembered: str
     unremembered: str
     reflection: str
+
+
+class GeneratedMemoryBookNoteResponse(BaseModel):
+    title: str
+    subtitle: str
+    periodSummary: str
+    placeSummary: str
+    opening: str
+    body: str
+    closing: str
+    keywords: List[str] = Field(default_factory=list)
+    sourceMemoryIds: List[str] = Field(default_factory=list)
 
 
 class TravelAnalysisResponse(BaseModel):
@@ -858,6 +872,181 @@ async def build_curated_memory_note(
                 "기억나는 부분과 기억나지 않는 부분을 "
                 "천천히 되짚어본다."
             ),
+        }
+
+
+# ============================================================
+# Generated Memory Book Note
+# ============================================================
+
+async def generate_memory_book_note(
+    memories: list[dict],
+    style: str = "warm",
+) -> dict:
+    selected_style = (
+        style
+        if style in {"warm", "documentary"}
+        else "warm"
+    )
+
+    allowed_source_ids = [
+        str(item.get("id", "")).strip()
+        for item in memories
+        if str(item.get("id", "")).strip()
+    ]
+
+    parts = [
+        types.Part.from_text(
+            text=build_note_generation_user_prompt(
+                memories=memories,
+                style=selected_style,
+            )
+        )
+    ]
+
+    try:
+        result = await _generate_json(
+            parts=parts,
+            system_instruction=NOTE_GENERATION_PROMPT,
+            response_schema=GeneratedMemoryBookNoteResponse,
+            operation_name="포토북 노트 생성",
+        )
+
+        returned_ids = result.get("sourceMemoryIds", []) or []
+        result["sourceMemoryIds"] = [
+            memory_id
+            for memory_id in returned_ids
+            if memory_id in allowed_source_ids
+        ] or allowed_source_ids
+
+        normalized_keywords = []
+        for keyword in result.get("keywords", []) or []:
+            clean_keyword = str(keyword).strip()
+            if (
+                clean_keyword
+                and clean_keyword not in normalized_keywords
+            ):
+                normalized_keywords.append(clean_keyword)
+
+        result["keywords"] = normalized_keywords[:5]
+        result["style"] = selected_style
+
+        print(
+            "📖 [포토북 노트 생성 완료] "
+            f"{result.get('title')}"
+        )
+
+        return result
+
+    except Exception as e:
+        print(
+            "⚠️ 포토북 노트 생성 실패. "
+            "로컬 fallback 사용"
+        )
+        print(
+            f"   {type(e).__name__}: "
+            f"{repr(e)}"
+        )
+
+        def clean(value) -> str:
+            return str(value or "").strip()
+
+        def unique_values(key: str) -> list[str]:
+            values = []
+            for memory in memories:
+                value = clean(memory.get(key))
+                if value and value not in values:
+                    values.append(value)
+            return values
+
+        body_chunks = []
+        for index, memory in enumerate(memories, start=1):
+            memory_title = (
+                clean(memory.get("title"))
+                or f"추억 {index}"
+            )
+            details = []
+
+            for key in (
+                "sceneDescription",
+                "remembered",
+                "reflection",
+            ):
+                value = clean(memory.get(key))
+                if value and value not in details:
+                    details.append(value)
+
+            if details:
+                body_chunks.append(
+                    memory_title
+                    + "\n"
+                    + "\n\n".join(details)
+                )
+
+        first_title = (
+            clean(memories[0].get("title"))
+            if memories
+            else ""
+        )
+        generated_title = (
+            first_title
+            if len(memories) == 1 and first_title
+            else "함께 엮은 추억의 장면들"
+        )
+
+        periods = unique_values("yearEstimate")
+        places = unique_values("location")
+        categories = unique_values("categoryFolder")
+        modes = unique_values("mode")
+        mode_labels = {
+            "travel": "여행",
+            "childhood": "유년시절",
+        }
+
+        keywords = []
+        for value in categories + [
+            mode_labels.get(mode, mode)
+            for mode in modes
+        ]:
+            if value and value not in keywords:
+                keywords.append(value)
+
+        return {
+            "title": generated_title,
+            "subtitle": (
+                f"{len(memories)}개의 추억 기록을 "
+                "바탕으로 엮은 노트"
+            ),
+            "periodSummary": (
+                " · ".join(periods[:3])
+                if periods
+                else "시기 미상"
+            ),
+            "placeSummary": (
+                " · ".join(places[:3])
+                if places
+                else "장소 미상"
+            ),
+            "opening": (
+                "선택한 사진과 인터뷰 기록에 남은 "
+                "장면들을 한 권의 노트로 모았다."
+            ),
+            "body": (
+                "\n\n".join(body_chunks)
+                if body_chunks
+                else (
+                    "선택한 기록에는 아직 글로 엮을 수 있는 "
+                    "구체적인 내용이 충분하지 않다."
+                )
+            ),
+            "closing": (
+                "이 노트는 현재 확인할 수 있는 기록만으로 "
+                "정리했으며, 새로운 기억이 떠오르면 "
+                "계속 덧붙일 수 있다."
+            ),
+            "keywords": keywords[:5],
+            "sourceMemoryIds": allowed_source_ids,
+            "style": selected_style,
         }
 
 
