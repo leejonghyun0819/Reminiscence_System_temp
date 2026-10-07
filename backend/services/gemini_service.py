@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
+
 from config import (
     GEMINI_API_KEY,
     GEMINI_MODEL,
@@ -54,6 +59,38 @@ BATCH_CHUNK_SIZE = GEMINI_CLASSIFY_BATCH_SIZE
 _client: Optional[genai.Client] = None
 
 
+def _validate_aiohttp_compatibility() -> None:
+    """Prevent a known google-genai/aiohttp version mismatch.
+
+    google-genai's async retry path references
+    aiohttp.ClientConnectorDNSError, which is available from 3.10.11.
+    An older transitive aiohttp install masks the original network error
+    with an AttributeError and makes every Gemini request fall back locally.
+    """
+
+    if aiohttp is None:
+        return
+
+    if hasattr(
+        aiohttp,
+        "ClientConnectorDNSError",
+    ):
+        return
+
+    installed_version = getattr(
+        aiohttp,
+        "__version__",
+        "unknown",
+    )
+
+    raise RuntimeError(
+        "호환되지 않는 aiohttp 버전이 설치되어 있습니다 "
+        f"(현재: {installed_version}, 필요: 3.10.11 이상). "
+        "backend에서 `python -m pip install -r requirements.txt --upgrade`를 "
+        "실행한 뒤 서버를 다시 시작해주세요."
+    )
+
+
 def _get_client() -> genai.Client:
 
     global _client
@@ -66,6 +103,8 @@ def _get_client() -> genai.Client:
             "GEMINI_API_KEY가 설정되지 않았습니다. "
             "backend/.env 파일을 확인해주세요."
         )
+
+    _validate_aiohttp_compatibility()
 
     _client = genai.Client(
         api_key=GEMINI_API_KEY,
