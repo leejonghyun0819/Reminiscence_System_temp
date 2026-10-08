@@ -46,6 +46,7 @@ export interface ModeDetectionResult {
 
 export interface CuratedNoteData {
     title: string;
+    titleSuggestions?: string[];
     sceneDescription: string;
     remembered: string;
     unremembered: string;

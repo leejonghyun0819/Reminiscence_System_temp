@@ -111,6 +111,7 @@ interface MemoryContextType {
 
     fetchMemories: () => Promise<void>;
     fetchFolders: () => Promise<void>;
+    fetchGeneratedNotes: () => Promise<void>;
     setSelectedEnhanceMemory: (memory: MemoryItem | null) => void;
     setSelectedGenerateMemory: (memory: MemoryItem | null) => void;
     clearSelectedGenerateMemory: () => void;
@@ -131,11 +132,11 @@ interface MemoryContextType {
     appendActiveMemory: (memory: MemoryItem) => void;
     appendActiveMemories: (memories: MemoryItem[]) => void;
 
-    addToGeneratedNotes: (memory: MemoryItem) => void;
-    addMultipleToGeneratedNotes: (memories: MemoryItem[]) => void;
-    updateGeneratedNote: (id: string, updates: { title: string; story: string }) => void;
-    deleteFromGeneratedNotes: (id: string) => void;
-    deleteMultipleFromGeneratedNotes: (ids: string[]) => void;
+    addToGeneratedNotes: (memory: MemoryItem) => Promise<boolean>;
+    addMultipleToGeneratedNotes: (memories: MemoryItem[]) => Promise<boolean>;
+    updateGeneratedNote: (id: string, updates: { title: string; story: string }) => Promise<boolean>;
+    deleteFromGeneratedNotes: (id: string) => Promise<boolean>;
+    deleteMultipleFromGeneratedNotes: (ids: string[]) => Promise<boolean>;
 
     swapAlbumImage: (memoryId: string, oldUrl: string, newUrl: string) => Promise<boolean>;
     appendAlbumImage: (memoryId: string, imageUrl: string) => Promise<boolean>;
@@ -233,8 +234,20 @@ export const MemoryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
+    const fetchGeneratedNotes = async () => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/generated-notes`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data: MemoryItem[] = await res.json();
+            setGeneratedNotes(Array.isArray(data) ? data : []);
+        } catch (e) {
+            console.error('생성 노트 로딩 실패:', e);
+        }
+    };
+
     useEffect(() => {
         fetchFolders();
+        fetchGeneratedNotes();
     }, []);
 
     const addMultiImageMemoryToServer = async (
@@ -563,50 +576,102 @@ export const MemoryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     };
 
-    const addToGeneratedNotes = (memory: MemoryItem) => {
-        setGeneratedNotes((prev) => (prev.some((n) => n.id === memory.id) ? prev : [memory, ...prev]));
+    const addToGeneratedNotes = async (memory: MemoryItem): Promise<boolean> => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/generated-notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: memory }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setGeneratedNotes((prev) => (prev.some((n) => n.id === memory.id) ? prev : [memory, ...prev]));
+            return true;
+        } catch (e) {
+            console.error('생성 노트 저장 실패:', e);
+            return false;
+        }
     };
 
-    const addMultipleToGeneratedNotes = (memories: MemoryItem[]) => {
-        setGeneratedNotes((prev) => {
-            const existingIds = new Set(prev.map((n) => n.id));
-            return [...memories.filter((m) => !existingIds.has(m.id)), ...prev];
-        });
+    const addMultipleToGeneratedNotes = async (memories: MemoryItem[]): Promise<boolean> => {
+        const results = await Promise.all(memories.map(addToGeneratedNotes));
+        return results.every(Boolean);
     };
 
-    const updateGeneratedNote = (id: string, updates: { title: string; story: string }) => {
-        setGeneratedNotes((prev) =>
-            prev.map((note) => {
-                if (note.id !== id) return note;
+    const updateGeneratedNote = async (
+        id: string,
+        updates: { title: string; story: string },
+    ): Promise<boolean> => {
+        const current = generatedNotes.find((note) => note.id === id);
+        if (!current) return false;
 
-                return {
-                    ...note,
-                    analysis: {
-                        ...note.analysis,
-                        title: updates.title,
-                        description: updates.story,
-                        storyCaption: updates.story,
-                    },
-                    generatedNote: note.generatedNote
-                        ? {
-                              ...note.generatedNote,
-                              title: updates.title,
-                              opening: '',
-                              body: updates.story,
-                              closing: '',
-                          }
-                        : note.generatedNote,
-                };
-            }),
-        );
+        const updatedNote: MemoryItem = {
+            ...current,
+            analysis: {
+                ...current.analysis,
+                title: updates.title,
+                description: updates.story,
+                storyCaption: updates.story,
+            },
+            generatedNote: current.generatedNote
+                ? {
+                      ...current.generatedNote,
+                      title: updates.title,
+                      opening: '',
+                      body: updates.story,
+                      closing: '',
+                  }
+                : current.generatedNote,
+        };
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/generated-notes/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: updatedNote }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setGeneratedNotes((prev) =>
+                prev.map((note) =>
+                    note.id === id
+                        ? updatedNote
+                        : note,
+                ),
+            );
+            return true;
+        } catch (e) {
+            console.error('생성 노트 수정 실패:', e);
+            return false;
+        }
     };
 
-    const deleteFromGeneratedNotes = (id: string) => {
-        setGeneratedNotes((prev) => prev.filter((n) => n.id !== id));
+    const deleteFromGeneratedNotes = async (id: string): Promise<boolean> => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/generated-notes/${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setGeneratedNotes((prev) => prev.filter((n) => n.id !== id));
+            return true;
+        } catch (e) {
+            console.error('생성 노트 삭제 실패:', e);
+            return false;
+        }
     };
 
-    const deleteMultipleFromGeneratedNotes = (ids: string[]) => {
-        setGeneratedNotes((prev) => prev.filter((n) => !ids.includes(n.id)));
+    const deleteMultipleFromGeneratedNotes = async (ids: string[]): Promise<boolean> => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/generated-notes/batch-delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setGeneratedNotes((prev) => prev.filter((n) => !ids.includes(n.id)));
+            return true;
+        } catch (e) {
+            console.error('생성 노트 일괄 삭제 실패:', e);
+            return false;
+        }
     };
 
     const clearSelectedGenerateMemory = () => {
@@ -679,6 +744,7 @@ export const MemoryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setCurrentMode,
                 fetchMemories,
                 fetchFolders,
+                fetchGeneratedNotes,
                 setSelectedEnhanceMemory,
                 setSelectedGenerateMemory,
                 clearSelectedGenerateMemory,

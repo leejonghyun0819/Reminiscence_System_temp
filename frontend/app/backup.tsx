@@ -34,12 +34,23 @@ export interface ExtendedBackupAlbumMeta extends BackupAlbumMeta {
 }
 
 type BackupRootCategory = '유년시절' | '여행' | '미분류';
+type StorageType = 'memory' | 'note';
 
 export default function BackupPage({ onClose }: { onClose?: () => void }) {
     const router = useRouter();
     const { width } = useWindowDimensions();
     const isNarrow = width < 900;
-    const { memoryList, fetchMemories, appendActiveMemory, appendActiveMemories } = useMemory();
+    const {
+        memoryList,
+        generatedNotes,
+        fetchMemories,
+        appendActiveMemory,
+        appendActiveMemories,
+        setSelectedGenerateMemory,
+        deleteFromGeneratedNotes,
+    } = useMemory();
+
+    const [activeStorage, setActiveStorage] = useState<StorageType>('memory');
 
     // AI 분류가 없는 레거시 앨범은 별도의 미분류 보관함에서 관리한다.
     const [activeRootCategory, setActiveRootCategory] = useState<BackupRootCategory>('유년시절');
@@ -83,6 +94,20 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
         if (onClose) onClose();
         else if (router.canGoBack()) router.back();
         else router.replace('/(tabs)');
+    };
+
+    const handleOpenGeneratedNote = (note: (typeof generatedNotes)[number]) => {
+        setSelectedGenerateMemory(note);
+        router.push('/(tabs)/generate');
+    };
+
+    const handleDeleteGeneratedNote = async (noteId: string) => {
+        const confirmed =
+            Platform.OS === 'web'
+                ? window.confirm('이 추억 노트를 보관함에서 삭제하시겠습니까?')
+                : true;
+        if (!confirmed) return;
+        await deleteFromGeneratedNotes(noteId);
     };
 
     const fetchBackupData = async () => {
@@ -575,14 +600,46 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
                 {/* 상단 헤더 */}
                 <View style={styles.headerRow}>
                     <MemoryPageHeader
-                        title="백업 보관함"
-                        subtitle="저장한 원본 추억을 폴더별로 정리하고 인터뷰 내용을 다시 확인하세요."
+                        title="기억과 추억 보관함"
+                        subtitle="노트가 되기 전의 기억 자료와 완성된 추억 노트를 나누어 관리하세요."
                     />
                     <TouchableOpacity style={styles.backToHomeBtn} onPress={handleCloseOrBack}>
                         <Text style={styles.backToHomeBtnText}>추억 수집으로</Text>
                     </TouchableOpacity>
                 </View>
 
+                <View style={styles.storageTypeTabs}>
+                    <TouchableOpacity
+                        style={[styles.storageTypeTab, activeStorage === 'memory' && styles.storageTypeTabActive]}
+                        onPress={() => setActiveStorage('memory')}
+                    >
+                        <Text
+                            style={[
+                                styles.storageTypeTabTitle,
+                                activeStorage === 'memory' && styles.storageTypeTabTitleActive,
+                            ]}
+                        >
+                            🗂️ 기억 보관함
+                        </Text>
+                        <Text style={styles.storageTypeTabDescription}>노트 생성 전 · 사진, 인터뷰, 상세 정보</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.storageTypeTab, activeStorage === 'note' && styles.storageTypeTabActive]}
+                        onPress={() => setActiveStorage('note')}
+                    >
+                        <Text
+                            style={[
+                                styles.storageTypeTabTitle,
+                                activeStorage === 'note' && styles.storageTypeTabTitleActive,
+                            ]}
+                        >
+                            📚 추억 보관함
+                        </Text>
+                        <Text style={styles.storageTypeTabDescription}>노트 생성 후 · 완성된 이야기와 사진</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {activeStorage === 'memory' ? (
                 <View style={[styles.backupWorkspace, isNarrow && styles.backupWorkspaceNarrow]}>
                     <View style={[styles.folderSidebar, isNarrow && styles.folderSidebarNarrow]}>
                         <Text style={styles.sidebarTitle}>내 폴더</Text>
@@ -1015,6 +1072,84 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
                         )}
                     </View>
                 </View>
+                ) : (
+                    <View style={styles.noteArchive}>
+                        <View style={styles.noteArchiveHeader}>
+                            <View>
+                                <Text style={styles.noteArchiveTitle}>완성된 추억 노트</Text>
+                                <Text style={styles.noteArchiveDescription}>
+                                    사진과 인터뷰를 엮어 최종 생성한 노트만 모아두는 공간입니다.
+                                </Text>
+                            </View>
+                            <Text style={styles.albumCountBadge}>{generatedNotes.length}개 노트</Text>
+                        </View>
+
+                        {generatedNotes.length === 0 ? (
+                            <View style={styles.noteArchiveEmpty}>
+                                <Text style={styles.emptyIcon}>📖</Text>
+                                <Text style={styles.emptyTitle}>아직 완성된 추억 노트가 없습니다.</Text>
+                                <Text style={styles.noteArchiveEmptyText}>
+                                    노트 생성에서 기억을 선택해 한 편의 이야기로 완성하면 이곳에 저장됩니다.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.noteCreateButton}
+                                    onPress={() => router.push('/(tabs)/generate')}
+                                >
+                                    <Text style={styles.noteCreateButtonText}>노트 생성으로 이동</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <ScrollView style={styles.albumListScroll} contentContainerStyle={styles.noteGrid}>
+                                {generatedNotes.map((note) => {
+                                    const story =
+                                        note.generatedNote?.body ||
+                                        note.analysis?.storyCaption ||
+                                        note.analysis?.description ||
+                                        '';
+                                    return (
+                                        <View key={note.id} style={styles.noteCard}>
+                                            <View style={styles.noteCoverRow}>
+                                                {note.imageUrls?.[0] ? (
+                                                    <Image source={{ uri: note.imageUrls[0] }} style={styles.noteCover} />
+                                                ) : (
+                                                    <View style={[styles.noteCover, styles.noteCoverFallback]}>
+                                                        <Text style={styles.emptyIcon}>📖</Text>
+                                                    </View>
+                                                )}
+                                                <View style={styles.noteCardCopy}>
+                                                    <Text style={styles.noteCardLabel}>완성된 추억 노트</Text>
+                                                    <Text style={styles.noteCardTitle} numberOfLines={2}>
+                                                        {note.analysis?.title || '제목 없는 추억 노트'}
+                                                    </Text>
+                                                    <Text style={styles.noteCardMeta} numberOfLines={1}>
+                                                        {`${note.analysis?.yearEstimate || '시기 미정'} · ${note.analysis?.location || '장소 미정'} · 사진 ${note.imageUrls?.length || 0}장`}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.noteCardStory} numberOfLines={4}>
+                                                {story || '저장된 이야기 내용이 없습니다.'}
+                                            </Text>
+                                            <View style={styles.noteCardActions}>
+                                                <TouchableOpacity
+                                                    style={styles.noteOpenButton}
+                                                    onPress={() => handleOpenGeneratedNote(note)}
+                                                >
+                                                    <Text style={styles.noteOpenButtonText}>노트 열기</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.deleteSingleBtn}
+                                                    onPress={() => handleDeleteGeneratedNote(note.id)}
+                                                >
+                                                    <Text style={styles.deleteSingleBtnText}>삭제</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+                    </View>
+                )}
 
                 {/* 모달들 */}
                 <CreateFolderModal
@@ -1250,6 +1385,40 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
     },
+    storageTypeTabs: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 24,
+    },
+    storageTypeTab: {
+        flexGrow: 1,
+        flexBasis: 320,
+        minHeight: 76,
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.surface,
+        justifyContent: 'center',
+    },
+    storageTypeTabActive: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+    },
+    storageTypeTabTitle: {
+        color: memoryColors.textSecondary,
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    storageTypeTabTitleActive: { color: memoryColors.brand },
+    storageTypeTabDescription: {
+        color: memoryColors.textMuted,
+        fontSize: 12,
+        lineHeight: 19,
+        marginTop: 4,
+    },
     backupWorkspace: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 24 },
     backupWorkspaceNarrow: { flexDirection: 'column' },
     folderSidebar: {
@@ -1480,10 +1649,8 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     albumCard: {
-        flexGrow: 1,
-        flexBasis: 300,
-        maxWidth: 520,
-        minWidth: 280,
+        width: '100%',
+        minWidth: 0,
         flexDirection: 'row',
         alignItems: 'flex-start',
         borderWidth: 1,
@@ -1510,7 +1677,7 @@ const styles = StyleSheet.create({
     checkboxActive: { backgroundColor: '#0284C7', borderColor: '#0284C7' },
     checkmark: { fontSize: 12, color: 'transparent', fontWeight: '800' },
     checkmarkActive: { color: '#FFFFFF' },
-    albumInfoWrapper: { flex: 1, gap: 10 },
+    albumInfoWrapper: { flex: 1, minWidth: 0, width: '100%', gap: 12 },
     thumbScroll: { flexDirection: 'row', gap: 10 },
     thumbContainer: {
         width: 78,
@@ -1520,14 +1687,8 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     thumbImg: { width: 78, height: 60, borderRadius: 6 },
-    metaRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    albumTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+    metaRow: { gap: 12 },
+    albumTitle: { flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '700', color: '#0F172A' },
     folderTag: {
         backgroundColor: '#F1F5F9',
         paddingHorizontal: 6,
@@ -1554,7 +1715,107 @@ const styles = StyleSheet.create({
     },
     alreadyBadgeText: { fontSize: 11, color: '#0369A1', fontWeight: '700' },
     albumSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
-    cardBtnGroup: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+    cardBtnGroup: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', width: '100%' },
+    noteArchive: {
+        flex: 1,
+        minHeight: 0,
+    },
+    noteArchiveHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        marginBottom: 18,
+    },
+    noteArchiveTitle: {
+        color: memoryColors.text,
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+    },
+    noteArchiveDescription: {
+        color: memoryColors.textMuted,
+        fontSize: 13,
+        lineHeight: 21,
+        marginTop: 2,
+    },
+    noteArchiveEmpty: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 360,
+        padding: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.surface,
+    },
+    noteArchiveEmptyText: {
+        color: memoryColors.textMuted,
+        fontSize: 13,
+        lineHeight: 21,
+        textAlign: 'center',
+        marginTop: 6,
+    },
+    noteCreateButton: {
+        marginTop: 18,
+        paddingHorizontal: 18,
+        paddingVertical: 11,
+        borderRadius: 8,
+        backgroundColor: memoryColors.brand,
+    },
+    noteCreateButtonText: { color: memoryColors.surface, fontSize: 13, fontWeight: '700' },
+    noteGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 16,
+        paddingBottom: 24,
+    },
+    noteCard: {
+        flexGrow: 1,
+        flexBasis: 460,
+        minWidth: 300,
+        maxWidth: 650,
+        padding: 20,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.surface,
+    },
+    noteCoverRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    noteCover: {
+        width: 124,
+        height: 92,
+        borderRadius: 10,
+        backgroundColor: memoryColors.subtle,
+    },
+    noteCoverFallback: { alignItems: 'center', justifyContent: 'center' },
+    noteCardCopy: { flex: 1, minWidth: 0 },
+    noteCardLabel: { color: memoryColors.brand, fontSize: 11, fontWeight: '700', marginBottom: 5 },
+    noteCardTitle: { color: memoryColors.text, fontSize: 18, lineHeight: 26, fontWeight: '700' },
+    noteCardMeta: { color: memoryColors.textMuted, fontSize: 11, marginTop: 7 },
+    noteCardStory: {
+        color: memoryColors.textSecondary,
+        fontSize: 13,
+        lineHeight: 21,
+        marginTop: 16,
+        minHeight: 78,
+    },
+    noteCardActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 8,
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: memoryColors.border,
+    },
+    noteOpenButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 7,
+        backgroundColor: memoryColors.brand,
+    },
+    noteOpenButtonText: { color: memoryColors.surface, fontSize: 12, fontWeight: '700' },
     renameFilesBtn: {
         backgroundColor: '#E0F2FE',
         borderWidth: 1,

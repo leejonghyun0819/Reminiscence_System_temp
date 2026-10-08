@@ -344,7 +344,7 @@ export default function IndexScreen() {
         const ok =
             Platform.OS === 'web'
                 ? window.confirm(
-                      `'${title || '이 추억'}'을(를) 홈 작업 화면에서 없애시겠습니까?\n(추억 보관함에는 안전하게 유지됩니다.)`,
+                      `'${title || '이 추억'}'을(를) 홈 작업 화면에서 없애시겠습니까?\n(기억 보관함에는 안전하게 유지됩니다.)`,
                   )
                 : true;
         if (!ok) return;
@@ -363,7 +363,7 @@ export default function IndexScreen() {
         const ok =
             Platform.OS === 'web'
                 ? window.confirm(
-                      `선택한 ${count}개의 앨범을 홈 작업 목록에서 없애시겠습니까?\n(추억 보관함에는 안전하게 보존됩니다.)`,
+                      `선택한 ${count}개의 앨범을 홈 작업 목록에서 없애시겠습니까?\n(기억 보관함에는 안전하게 보존됩니다.)`,
                   )
                 : true;
         if (!ok) return;

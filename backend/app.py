@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from routers import gemini, youcam, memories, folders, backup
+from routers import gemini, youcam, memories, folders, backup, generated_notes
 
 from config import ALBUMS_DIR, ENHANCED_DIR
 from database import init_db
@@ -70,6 +70,7 @@ app.include_router(youcam.router)
 app.include_router(memories.router)
 app.include_router(folders.router)
 app.include_router(backup.router)
+app.include_router(generated_notes.router)
 
 
 

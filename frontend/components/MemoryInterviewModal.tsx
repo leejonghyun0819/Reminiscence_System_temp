@@ -79,6 +79,9 @@ export function MemoryInterviewModal({
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [statusText, setStatusText] = useState<string>('');
     const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+    const [draftCuratedNote, setDraftCuratedNote] = useState<CuratedNoteData | null>(null);
+    const [pendingQaPairs, setPendingQaPairs] = useState<InterviewAnswerItem[]>([]);
+    const [customTitle, setCustomTitle] = useState<string>('');
 
     useEffect(() => {
         if (visible) {
@@ -87,6 +90,9 @@ export function MemoryInterviewModal({
             setIsSubmitting(false);
             setStatusText('');
             setPreviewImage(null);
+            setDraftCuratedNote(null);
+            setPendingQaPairs([]);
+            setCustomTitle('');
         }
     }, [visible, initialAnswers, initialExtraStory]);
 
@@ -145,14 +151,40 @@ export function MemoryInterviewModal({
                 qaPairs,
             );
 
-            setStatusText('✨ 추억 노트 완성! 적용 중...');
-            onComplete(curatedNote, qaPairs, extraStory);
+            setDraftCuratedNote(curatedNote);
+            setPendingQaPairs(qaPairs);
+            setCustomTitle('');
         } catch (error: any) {
             Alert.alert('재분석 오류', error?.message || '답변을 반영하는 중 문제가 발생했습니다.');
         } finally {
             setIsSubmitting(false);
             setStatusText('');
         }
+    };
+
+    const titleSuggestions = Array.from(
+        new Set([...(draftCuratedNote?.titleSuggestions || []), draftCuratedNote?.title || '']),
+    )
+        .map((title) => title.trim())
+        .filter(Boolean)
+        .slice(0, 5);
+
+    const handleApplyTitle = () => {
+        if (!draftCuratedNote) return;
+        const title = customTitle.trim();
+        if (!title) {
+            Alert.alert('제목을 입력해주세요', '직접 작성하거나 아래 추천 제목 중 하나를 선택할 수 있어요.');
+            return;
+        }
+
+        onComplete(
+            {
+                ...draftCuratedNote,
+                title,
+            },
+            pendingQaPairs,
+            extraStory,
+        );
     };
 
     if (!visible) return null;
@@ -164,9 +196,15 @@ export function MemoryInterviewModal({
                     <View style={styles.container}>
                         <View style={styles.header}>
                             <View style={styles.headerTextArea}>
-                                <Text style={styles.headerTitle}>사진을 보며, 떠오르는 기억을 들려주세요</Text>
+                                <Text style={styles.headerTitle}>
+                                    {draftCuratedNote
+                                        ? '마지막으로, 이 기억의 제목을 지어주세요'
+                                        : '사진을 보며, 떠오르는 기억을 들려주세요'}
+                                </Text>
                                 <Text style={styles.headerSubtitle}>
-                                    입력한 단서와 사진별 질문을 함께 확인합니다. 기억나지 않는 답변은 비워도 됩니다.
+                                    {draftCuratedNote
+                                        ? 'AI가 글을 정리하고 제목 후보를 준비했어요. 최종 제목은 직접 결정합니다.'
+                                        : '입력한 단서와 사진별 질문을 함께 확인합니다. 기억나지 않는 답변은 비워도 됩니다.'}
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -218,6 +256,84 @@ export function MemoryInterviewModal({
                             </View>
 
                             <View style={styles.questionPane}>
+                                {draftCuratedNote ? (
+                                    <View style={styles.titleStep}>
+                                        <View style={styles.titleStepCard}>
+                                            <Text style={styles.titleStepEyebrow}>내가 정하는 추억 제목</Text>
+                                            <Text style={styles.titleStepHeading}>어떤 이름으로 기억하고 싶나요?</Text>
+                                            <Text style={styles.titleStepDescription}>
+                                                길고 설명적인 문장보다, 나중에 사진을 다시 찾았을 때 바로 떠오를 짧은 제목이 좋아요.
+                                            </Text>
+
+                                            <TextInput
+                                                style={styles.titleInput}
+                                                value={customTitle}
+                                                onChangeText={(value) => setCustomTitle(value.slice(0, 40))}
+                                                placeholder="예: 장난감 기차를 늘어놓던 오후"
+                                                placeholderTextColor={memoryColors.textFaint}
+                                                autoFocus
+                                                maxLength={40}
+                                            />
+                                            <Text style={styles.titleLength}>{customTitle.length} / 40</Text>
+
+                                            <Text style={styles.suggestionLabel}>AI 추천 제목</Text>
+                                            <Text style={styles.suggestionGuide}>
+                                                그대로 선택하거나, 마음에 드는 표현만 참고해서 바꿔도 됩니다.
+                                            </Text>
+                                            <View style={styles.suggestionList}>
+                                                {titleSuggestions.map((title) => {
+                                                    const selected = customTitle === title;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={title}
+                                                            style={[
+                                                                styles.suggestionChip,
+                                                                selected && styles.suggestionChipActive,
+                                                            ]}
+                                                            onPress={() => setCustomTitle(title)}
+                                                        >
+                                                            <Text
+                                                                style={[
+                                                                    styles.suggestionChipText,
+                                                                    selected && styles.suggestionChipTextActive,
+                                                                ]}
+                                                            >
+                                                                {title}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+
+                                            <View style={styles.titlePreviewBox}>
+                                                <Text style={styles.titlePreviewLabel}>작성된 기억 미리보기</Text>
+                                                <Text style={styles.titlePreviewText} numberOfLines={5}>
+                                                    {draftCuratedNote.remembered || draftCuratedNote.sceneDescription}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.buttonRow}>
+                                            <TouchableOpacity
+                                                style={styles.cancelButton}
+                                                onPress={() => setDraftCuratedNote(null)}
+                                            >
+                                                <Text style={styles.cancelButtonText}>답변 수정</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.submitButton,
+                                                    !customTitle.trim() && styles.submitButtonDisabled,
+                                                ]}
+                                                onPress={handleApplyTitle}
+                                                disabled={!customTitle.trim()}
+                                            >
+                                                <Text style={styles.submitButtonText}>이 제목으로 기억 저장</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <>
                                 <ScrollView
                                     style={styles.body}
                                     contentContainerStyle={styles.bodyContent}
@@ -455,6 +571,8 @@ export function MemoryInterviewModal({
                                         </TouchableOpacity>
                                     </View>
                                 </View>
+                                    </>
+                                )}
                             </View>
                         </View>
                     </View>
@@ -626,6 +744,112 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     questionPane: { flex: 1, minWidth: 0, minHeight: 0 },
+    titleStep: {
+        flex: 1,
+        justifyContent: 'space-between',
+        gap: 20,
+    },
+    titleStepCard: {
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 16,
+        padding: 28,
+    },
+    titleStepEyebrow: {
+        color: memoryColors.brand,
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    titleStepHeading: {
+        color: memoryColors.text,
+        fontSize: 24,
+        lineHeight: 34,
+        fontWeight: '700',
+    },
+    titleStepDescription: {
+        color: memoryColors.textMuted,
+        fontSize: 13,
+        lineHeight: 21,
+        marginTop: 6,
+        marginBottom: 22,
+    },
+    titleInput: {
+        width: '100%',
+        minHeight: 54,
+        borderWidth: 1.5,
+        borderColor: memoryColors.brandBorder,
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        color: memoryColors.text,
+        fontSize: 17,
+        fontWeight: '600',
+        backgroundColor: memoryColors.surface,
+        outlineStyle: 'none' as any,
+    },
+    titleLength: {
+        alignSelf: 'flex-end',
+        color: memoryColors.textFaint,
+        fontSize: 11,
+        marginTop: 6,
+    },
+    suggestionLabel: {
+        color: memoryColors.text,
+        fontSize: 14,
+        fontWeight: '700',
+        marginTop: 18,
+    },
+    suggestionGuide: {
+        color: memoryColors.textMuted,
+        fontSize: 12,
+        lineHeight: 19,
+        marginTop: 3,
+    },
+    suggestionList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
+    },
+    suggestionChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.subtle,
+    },
+    suggestionChipActive: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+    },
+    suggestionChipText: {
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    suggestionChipTextActive: {
+        color: memoryColors.brand,
+        fontWeight: '700',
+    },
+    titlePreviewBox: {
+        marginTop: 22,
+        padding: 16,
+        borderRadius: 10,
+        backgroundColor: memoryColors.subtle,
+    },
+    titlePreviewLabel: {
+        color: memoryColors.textMuted,
+        fontSize: 11,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+    titlePreviewText: {
+        color: memoryColors.textSecondary,
+        fontSize: 13,
+        lineHeight: 21,
+    },
     body: {
         flex: 1,
     },

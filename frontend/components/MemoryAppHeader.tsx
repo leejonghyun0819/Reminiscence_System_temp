@@ -60,7 +60,7 @@ export function MemoryAppHeader() {
                         activeOpacity={0.75}
                     >
                         <Text style={[styles.backupText, pathname === '/backup' && styles.backupTextActive]}>
-                            백업 보관함
+                            보관함
                         </Text>
                     </TouchableOpacity>
                 </ScrollView>

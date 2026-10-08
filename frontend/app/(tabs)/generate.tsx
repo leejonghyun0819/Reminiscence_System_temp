@@ -80,8 +80,9 @@ export default function GenerateScreen() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [activeNote]);
 
-    const handleGenerated = (note: MemoryItem) => {
-        addToGeneratedNotes(note);
+    const handleGenerated = async (note: MemoryItem) => {
+        const saved = await addToGeneratedNotes(note);
+        if (!saved) return;
         setActiveNote(note);
         setActivePhotoIdx(0);
         setShowBuilder(false);
@@ -102,14 +103,15 @@ export default function GenerateScreen() {
         setSelectedNoteIds(isAll ? new Set() : new Set(generatedNotes.map((item) => item.id)));
     };
 
-    const handleBatchDelete = () => {
+    const handleBatchDelete = async () => {
         if (selectedNoteIds.size === 0) return;
 
         const count = selectedNoteIds.size;
         const confirmed = Platform.OS === 'web' ? window.confirm(`선택한 ${count}개의 노트를 삭제하시겠습니까?`) : true;
         if (!confirmed) return;
 
-        deleteMultipleFromGeneratedNotes(Array.from(selectedNoteIds));
+        const deleted = await deleteMultipleFromGeneratedNotes(Array.from(selectedNoteIds));
+        if (!deleted) return;
         if (activeNote && selectedNoteIds.has(activeNote.id)) {
             const remaining = generatedNotes.filter((note) => !selectedNoteIds.has(note.id));
             setActiveNote(remaining[0] || null);
@@ -117,9 +119,10 @@ export default function GenerateScreen() {
         setSelectedNoteIds(new Set());
     };
 
-    const handleDeleteSingle = (id: string, event?: any) => {
+    const handleDeleteSingle = async (id: string, event?: any) => {
         event?.stopPropagation?.();
-        deleteFromGeneratedNotes(id);
+        const deleted = await deleteFromGeneratedNotes(id);
+        if (!deleted) return;
 
         if (activeNote?.id === id) {
             const remaining = generatedNotes.filter((note) => note.id !== id);
@@ -137,10 +140,11 @@ export default function GenerateScreen() {
         if (!activeNote) return;
 
         if (activeNote.generatedNote) {
-            updateGeneratedNote(activeNote.id, {
+            const saved = await updateGeneratedNote(activeNote.id, {
                 title: editTitle,
                 story: editStory,
             });
+            if (!saved) return;
 
             setActiveNote((prev) =>
                 prev
@@ -249,9 +253,9 @@ export default function GenerateScreen() {
                         <Text style={styles.betaBadge}>BETA</Text>
                         <View style={styles.betaNoticeCopy}>
                             <Text style={styles.betaNoticeTitle}>
-                                생성한 노트는 베타 기간 동안 현재 앱 실행 세션에 보관됩니다.
+                                생성한 노트는 추억 보관함에 안전하게 저장됩니다.
                             </Text>
-                            <Text style={styles.sessionNotice}>원본 추억은 백업 보관함에서 관리합니다.</Text>
+                            <Text style={styles.sessionNotice}>노트 생성 전 자료는 기억 보관함에서 관리합니다.</Text>
                         </View>
                     </View>
 

@@ -55,5 +55,14 @@ def init_db():
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS generated_notes (
+                id TEXT PRIMARY KEY,
+                note_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
 # 모듈 로드 시 최초 1회 실행 보장
 init_db()

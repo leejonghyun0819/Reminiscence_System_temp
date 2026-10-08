@@ -158,6 +158,7 @@ class InterviewResponse(BaseModel):
 
 class CuratedNoteResponse(BaseModel):
     title: str
+    titleSuggestions: List[str] = Field(default_factory=list)
     sceneDescription: str
     remembered: str
     unremembered: str
@@ -891,6 +892,11 @@ async def build_curated_memory_note(
 
         return {
             "title": title,
+            "titleSuggestions": [
+                title,
+                "사진 속에 남은 한 장면",
+                "기억을 다시 만난 날",
+            ],
             "sceneDescription": (
                 facts_and_clues.get(
                     "sceneFacts",
