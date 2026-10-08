@@ -106,12 +106,11 @@ export const DroppableAlbumCard: React.FC<DroppableAlbumCardProps> = ({ item, is
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 14,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        padding: 18,
+        padding: 24,
         position: 'relative',
-        marginBottom: 16,
     },
     cardSelected: {
         borderColor: '#0284C7',

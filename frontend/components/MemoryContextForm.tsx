@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
     MemoryContextData,
     MemoryOwner,
@@ -13,6 +7,7 @@ import {
     MEMORY_OWNER_LABELS,
     MEMORY_PURPOSE_LABELS,
 } from '../types/memoryContext';
+import { memoryColors, memoryFontFamily } from '../constants/memoryTheme';
 
 interface MemoryContextFormProps {
     value: MemoryContextData;
@@ -21,22 +16,10 @@ interface MemoryContextFormProps {
 }
 
 const MEMORY_OWNERS: MemoryOwner[] = ['self', 'family', 'unknown'];
-const MEMORY_PURPOSES: MemoryPurpose[] = [
-    'personal_record',
-    'family_archive',
-    'gift',
-    'organize',
-];
+const MEMORY_PURPOSES: MemoryPurpose[] = ['personal_record', 'family_archive', 'gift', 'organize'];
 
-export function MemoryContextForm({
-    value,
-    onChange,
-    disabled = false,
-}: MemoryContextFormProps) {
-    const updateField = <Key extends keyof MemoryContextData>(
-        key: Key,
-        fieldValue: MemoryContextData[Key],
-    ) => {
+export function MemoryContextForm({ value, onChange, disabled = false }: MemoryContextFormProps) {
+    const updateField = <Key extends keyof MemoryContextData>(key: Key, fieldValue: MemoryContextData[Key]) => {
         onChange({
             ...value,
             [key]: fieldValue,
@@ -52,8 +35,8 @@ export function MemoryContextForm({
                 <View style={styles.headingTextArea}>
                     <Text style={styles.title}>AI가 길을 잃지 않도록 먼저 알려주세요</Text>
                     <Text style={styles.description}>
-                        모르는 항목은 비워도 됩니다. 입력한 사실은 우선 반영하고,
-                        비어 있는 부분은 사진별 질문으로 확인합니다.
+                        모르는 항목은 비워도 됩니다. 입력한 사실은 우선 반영하고, 비어 있는 부분은 사진별 질문으로
+                        확인합니다.
                     </Text>
                 </View>
             </View>
@@ -71,12 +54,7 @@ export function MemoryContextForm({
                             accessibilityRole="button"
                             accessibilityState={{ selected, disabled }}
                         >
-                            <Text
-                                style={[
-                                    styles.chipText,
-                                    selected && styles.chipTextSelected,
-                                ]}
-                            >
+                            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                                 {MEMORY_OWNER_LABELS[owner]}
                             </Text>
                         </TouchableOpacity>
@@ -97,12 +75,7 @@ export function MemoryContextForm({
                             accessibilityRole="button"
                             accessibilityState={{ selected, disabled }}
                         >
-                            <Text
-                                style={[
-                                    styles.chipText,
-                                    selected && styles.chipTextSelected,
-                                ]}
-                            >
+                            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                                 {MEMORY_PURPOSE_LABELS[purpose]}
                             </Text>
                         </TouchableOpacity>
@@ -169,101 +142,109 @@ export function MemoryContextForm({
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#BAE6FD',
-        backgroundColor: '#F0F9FF',
-        borderRadius: 12,
-        padding: 16,
+        marginBottom: 18,
     },
     headingRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 10,
-        marginBottom: 15,
+        gap: 12,
+        marginBottom: 18,
     },
     stepBadge: {
-        backgroundColor: '#0284C7',
-        borderRadius: 7,
-        paddingHorizontal: 9,
-        paddingVertical: 5,
+        backgroundColor: memoryColors.brandLight,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
     },
     stepBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 11,
-        fontWeight: '800',
+        color: memoryColors.brand,
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: memoryFontFamily,
     },
     headingTextArea: {
         flex: 1,
     },
     title: {
-        color: '#0F172A',
-        fontSize: 14,
-        fontWeight: '800',
+        color: memoryColors.text,
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+        fontFamily: memoryFontFamily,
     },
     description: {
-        color: '#475569',
+        color: memoryColors.textMuted,
         fontSize: 12,
-        lineHeight: 18,
-        marginTop: 3,
+        lineHeight: 20,
+        marginTop: 4,
+        fontFamily: memoryFontFamily,
     },
     label: {
-        color: '#334155',
-        fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 7,
+        color: memoryColors.text,
+        fontSize: 13,
+        lineHeight: 20,
+        fontWeight: '500',
+        marginBottom: 8,
+        fontFamily: memoryFontFamily,
     },
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 7,
-        marginBottom: 14,
+        gap: 8,
+        marginBottom: 16,
     },
     chip: {
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#CBD5E1',
-        borderRadius: 16,
-        paddingHorizontal: 11,
+        borderColor: memoryColors.border,
+        borderRadius: 999,
+        paddingHorizontal: 12,
         paddingVertical: 7,
     },
     chipSelected: {
-        backgroundColor: '#0284C7',
-        borderColor: '#0284C7',
+        backgroundColor: memoryColors.brandLight,
+        borderColor: memoryColors.brandLight,
     },
     chipText: {
-        color: '#475569',
+        color: memoryColors.textSecondary,
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '500',
+        fontFamily: memoryFontFamily,
     },
     chipTextSelected: {
-        color: '#FFFFFF',
+        color: memoryColors.brand,
         fontWeight: '700',
     },
     inputGrid: {
-        gap: 10,
-        marginBottom: 11,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 14,
     },
     inputGroup: {
-        flex: 1,
+        flexGrow: 1,
+        flexBasis: 190,
     },
     inputLabel: {
-        color: '#475569',
-        fontSize: 11,
-        fontWeight: '700',
-        marginBottom: 5,
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '500',
+        marginBottom: 6,
+        fontFamily: memoryFontFamily,
     },
     input: {
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#CBD5E1',
+        borderColor: memoryColors.border,
         borderRadius: 8,
         paddingHorizontal: 11,
         paddingVertical: 9,
-        color: '#0F172A',
-        fontSize: 12,
+        color: memoryColors.text,
+        fontSize: 13,
+        lineHeight: 20,
+        fontFamily: memoryFontFamily,
     },
     multilineInput: {
-        minHeight: 76,
+        minHeight: 48,
     },
 });

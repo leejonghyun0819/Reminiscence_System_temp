@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
+    useWindowDimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -24,16 +25,18 @@ import {
 } from '../../services/geminiService';
 import { MemoryInterviewModal } from '../../components/MemoryInterviewModal';
 import { MemoryContextForm } from '../../components/MemoryContextForm';
-import {
-    DEFAULT_MEMORY_CONTEXT,
-    MemoryContextData,
-} from '../../types/memoryContext';
+import { DEFAULT_MEMORY_CONTEXT, MemoryContextData } from '../../types/memoryContext';
 import { DroppableAlbumCard } from '../../features/index/DroppableAlbumCard';
 import { GalleryViewerModal } from '../../features/index/GalleryViewerModal';
 import { EditMemoryModal } from '../../features/index/EditMemoryModal';
+import { MemoryAppHeader } from '../../components/MemoryAppHeader';
+import { MemoryPageHeader } from '../../components/MemoryPageHeader';
+import { memoryColors, memoryFontFamily, memoryLayout } from '../../constants/memoryTheme';
 
 export default function IndexScreen() {
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const isNarrow = width < 920;
     const {
         memoryList,
         folderList,
@@ -221,10 +224,7 @@ export default function IndexScreen() {
             });
             setInterviewModalVisible(true);
         } catch (error: any) {
-            Alert.alert(
-                '실패',
-                error?.message || '사진별 기억 질문을 만드는 중 문제가 발생했습니다.',
-            );
+            Alert.alert('실패', error?.message || '사진별 기억 질문을 만드는 중 문제가 발생했습니다.');
         } finally {
             setIsProcessing(false);
             setStatusMessage('');
@@ -278,8 +278,7 @@ export default function IndexScreen() {
         setIsProcessing(true);
         setStatusMessage('인터뷰 답변을 바탕으로 추억 노트를 갱신 중...');
 
-        const finalMode =
-            interviewData.detectedMode || activeEditingMemory?.mode || 'childhood';
+        const finalMode = interviewData.detectedMode || activeEditingMemory?.mode || 'childhood';
 
         try {
             const updatedInterviewData = {
@@ -400,301 +399,322 @@ export default function IndexScreen() {
                 </>
             )}
 
-            {/* 헤더 */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Reminiscence Note</Text>
-                <Text style={styles.headerSubtitle}>
-                    사진과 기억의 단서를 바탕으로 AI가 질문하고, 확인된 답변으로 추억
-                    노트를 만듭니다.
-                </Text>
-            </View>
+            <MemoryAppHeader />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* 🌟 기존 DroppableAlbumCard를 그대로 활용하여 드래그 앤 드롭 완벽 지원 */}
-                <DroppableAlbumCard
-                    item={{ id: 'new_upload_card', fileNames: [], imageUrls: [] }}
-                    onDropFiles={handleDropFilesOnNewUploadCard}
-                >
-                    <View style={styles.cardHeaderRow}>
-                        <Text style={styles.cardTitle}>새 추억 사진 등록</Text>
-                        <Text style={styles.cardHeaderHint}>
-                            💡 사진 파일을 이 영역에 직접 끌어다 놓아도 바로 등록됩니다.
-                        </Text>
-                    </View>
-
-                    {/* 넓어진 드롭존 영역 */}
-                    <View style={styles.largeDropZone}>
-                        {selectedImages.length === 0 ? (
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                style={styles.dropZoneEmptyClickable}
-                                onPress={handlePickImages}
-                            >
-                                <Text style={styles.dropZoneIcon}>📥</Text>
-                                <Text style={styles.dropZonePrimaryText}>
-                                    사진을 이곳에 끌어다 놓거나 클릭하여 선택하세요
-                                </Text>
-                                <Text style={styles.dropZoneSubText}>JPG, PNG, WEBP 등 다중 사진 드래그 지원</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <View style={styles.previewGridContainer}>
-                                {selectedImages.map((img, idx) => (
-                                    <View key={idx} style={styles.previewGridItem}>
-                                        <Image source={{ uri: img.uri }} style={styles.previewGridImage} />
-                                        <TouchableOpacity
-                                            style={styles.removeBadge}
-                                            onPress={() =>
-                                                setSelectedImages((prev) => prev.filter((_, i) => i !== idx))
-                                            }
-                                        >
-                                            <Text style={styles.removeBadgeText}>✕</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
-                                <TouchableOpacity style={styles.addMoreGridBtn} onPress={handlePickImages}>
-                                    <Text style={styles.addMoreGridIcon}>＋</Text>
-                                    <Text style={styles.addMoreGridText}>사진 추가</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-
-                    <MemoryContextForm
-                        value={memoryContext}
-                        onChange={setMemoryContext}
-                        disabled={isProcessing}
+                <View style={[styles.pageShell, isNarrow && styles.pageShellNarrow]}>
+                    <MemoryPageHeader
+                        title="사진 속 순간에, 나의 기억을 더하세요"
+                        subtitle="사진과 기억의 단서를 바탕으로 AI가 질문하고, 확인된 답변으로 추억 노트를 만듭니다."
                     />
 
-                    {/* 음성 첨부 */}
-                    <View style={styles.optionRow}>
-                        {selectedAudio ? (
-                            <View style={styles.audioChip}>
-                                <Text style={styles.audioChipText}>🎤 {selectedAudio.name}</Text>
-                                <TouchableOpacity onPress={() => setSelectedAudio(null)}>
-                                    <Text style={styles.audioRemoveText}>✕</Text>
+                    <View style={[styles.uploadWorkspace, isNarrow && styles.uploadWorkspaceNarrow]}>
+                        <View style={[styles.uploadColumn, isNarrow && styles.fullWidthColumn]}>
+                            <DroppableAlbumCard
+                                item={{ id: 'new_upload_card', fileNames: [], imageUrls: [] }}
+                                onDropFiles={handleDropFilesOnNewUploadCard}
+                            >
+                                <View style={styles.cardHeaderRow}>
+                                    <Text style={styles.cardTitle}>새 추억 사진 등록</Text>
+                                </View>
+
+                                <View style={styles.largeDropZone}>
+                                    {selectedImages.length === 0 ? (
+                                        <TouchableOpacity
+                                            activeOpacity={0.8}
+                                            style={styles.dropZoneEmptyClickable}
+                                            onPress={handlePickImages}
+                                        >
+                                            <Text style={styles.dropZoneIcon}>＋</Text>
+                                            <Text style={styles.dropZonePrimaryText}>사진을 끌어놓거나 선택하세요</Text>
+                                            <Text style={styles.dropZoneSubText}>앨범 사진 표시 영역</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={styles.previewGridContainer}>
+                                            {selectedImages.map((img, idx) => (
+                                                <View key={idx} style={styles.previewGridItem}>
+                                                    <Image source={{ uri: img.uri }} style={styles.previewGridImage} />
+                                                    <TouchableOpacity
+                                                        style={styles.removeBadge}
+                                                        onPress={() =>
+                                                            setSelectedImages((prev) =>
+                                                                prev.filter((_, i) => i !== idx),
+                                                            )
+                                                        }
+                                                    >
+                                                        <Text style={styles.removeBadgeText}>✕</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                            <TouchableOpacity style={styles.addMoreGridBtn} onPress={handlePickImages}>
+                                                <Text style={styles.addMoreGridIcon}>＋</Text>
+                                                <Text style={styles.addMoreGridText}>사진 추가</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <Text style={styles.fileTypeHint}>JPG · PNG · WEBP / 여러 장 선택 가능</Text>
+                                <TouchableOpacity style={styles.fileSelectBtn} onPress={handlePickImages}>
+                                    <Text style={styles.fileSelectBtnText}>사진 선택</Text>
                                 </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <TouchableOpacity style={styles.audioAddBtn} onPress={handlePickAudio}>
-                                <Text style={styles.audioAddBtnText}>🎤 음성 녹음/파일 첨부 (선택)</Text>
+
+                                <View style={styles.optionRow}>
+                                    {selectedAudio ? (
+                                        <View style={styles.audioChip}>
+                                            <Text style={styles.audioChipText}>🎤 {selectedAudio.name}</Text>
+                                            <TouchableOpacity onPress={() => setSelectedAudio(null)}>
+                                                <Text style={styles.audioRemoveText}>✕</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity style={styles.audioAddBtn} onPress={handlePickAudio}>
+                                            <Text style={styles.audioAddBtnText}>음성 파일 첨부 · 선택</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <Text style={styles.folderLabel}>보관 폴더</Text>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.folderRow}
+                                >
+                                    {folderList.map((f) => (
+                                        <TouchableOpacity
+                                            key={f}
+                                            style={[styles.folderChip, selectedFolder === f && styles.folderChipActive]}
+                                            onPress={() => setSelectedFolder(f)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.folderChipText,
+                                                    selectedFolder === f && styles.folderChipTextActive,
+                                                ]}
+                                            >
+                                                {f}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </DroppableAlbumCard>
+                        </View>
+
+                        <View style={[styles.contextCard, isNarrow && styles.fullWidthColumn]}>
+                            <MemoryContextForm
+                                value={memoryContext}
+                                onChange={setMemoryContext}
+                                disabled={isProcessing}
+                            />
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.actionSubmitBtn,
+                                    (isProcessing || selectedImages.length === 0) && styles.actionSubmitBtnDisabled,
+                                ]}
+                                onPress={handleStartProcess}
+                                disabled={isProcessing || selectedImages.length === 0}
+                            >
+                                {isProcessing ? (
+                                    <View style={styles.loadingRow}>
+                                        <ActivityIndicator color="#fff" size="small" />
+                                        <Text style={styles.actionSubmitBtnText}>{statusMessage || '분석 중...'}</Text>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.actionSubmitBtnText}>
+                                        {selectedImages.length > 0
+                                            ? `${selectedImages.length}장의 사진으로 AI 기억 인터뷰 시작`
+                                            : 'AI 기억 인터뷰 시작'}
+                                    </Text>
+                                )}
                             </TouchableOpacity>
-                        )}
+                        </View>
                     </View>
 
-                    {/* 보관 폴더 */}
-                    <View style={styles.folderRow}>
-                        <Text style={styles.folderLabel}>폴더:</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {folderList.map((f) => (
-                                <TouchableOpacity
-                                    key={f}
-                                    style={[styles.folderChip, selectedFolder === f && styles.folderChipActive]}
-                                    onPress={() => setSelectedFolder(f)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.folderChipText,
-                                            selectedFolder === f && styles.folderChipTextActive,
-                                        ]}
+                    {/* 현재 작업 중인 앨범 카드 목록 섹션 */}
+                    <View style={styles.albumSection}>
+                        <View style={styles.sectionHeaderRow}>
+                            <Text style={styles.sectionTitle}>현재 작업 목록 ({memoryList.length})</Text>
+
+                            {memoryList.length > 0 && (
+                                <View style={styles.toolbarGroup}>
+                                    <TouchableOpacity
+                                        style={styles.selectToggleBtn}
+                                        onPress={() => {
+                                            if (isAllSelected) setSelectedAlbumIds(new Set());
+                                            else setSelectedAlbumIds(new Set(memoryList.map((m) => m.id)));
+                                        }}
                                     >
-                                        📁 {f}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-
-                    {/* 분석 시작 버튼 */}
-                    <TouchableOpacity
-                        style={[
-                            styles.actionSubmitBtn,
-                            (isProcessing || selectedImages.length === 0) && styles.actionSubmitBtnDisabled,
-                        ]}
-                        onPress={handleStartProcess}
-                        disabled={isProcessing || selectedImages.length === 0}
-                    >
-                        {isProcessing ? (
-                            <View style={styles.loadingRow}>
-                                <ActivityIndicator color="#fff" size="small" />
-                                <Text style={styles.actionSubmitBtnText}>{statusMessage || '분석 중...'}</Text>
-                            </View>
-                        ) : (
-                            <Text style={styles.actionSubmitBtnText}>
-                                {selectedImages.length > 0
-                                    ? `✨ ${selectedImages.length}장의 사진으로 맥락 인터뷰 시작`
-                                    : '✨ 사진과 단서로 인터뷰 시작'}
-                            </Text>
-                        )}
-                    </TouchableOpacity>
-                </DroppableAlbumCard>
-
-                {/* 현재 작업 중인 앨범 카드 목록 섹션 */}
-                <View style={styles.albumSection}>
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>현재 작업 목록 ({memoryList.length})</Text>
-
-                        {memoryList.length > 0 && (
-                            <View style={styles.toolbarGroup}>
-                                <TouchableOpacity
-                                    style={styles.selectToggleBtn}
-                                    onPress={() => {
-                                        if (isAllSelected) setSelectedAlbumIds(new Set());
-                                        else setSelectedAlbumIds(new Set(memoryList.map((m) => m.id)));
-                                    }}
-                                >
-                                    <Text style={styles.selectToggleBtnText}>
-                                        {isAllSelected ? '전체 해제' : '전체 선택'}
-                                    </Text>
-                                </TouchableOpacity>
-
-                                {selectedAlbumIds.size > 0 && (
-                                    <TouchableOpacity style={styles.batchRemoveBtn} onPress={handleBatchRemoveFromHome}>
-                                        <Text style={styles.batchRemoveBtnText}>
-                                            {`✕ 홈에서 없애기 (${selectedAlbumIds.size})`}
+                                        <Text style={styles.selectToggleBtnText}>
+                                            {isAllSelected ? '전체 해제' : '전체 선택'}
                                         </Text>
                                     </TouchableOpacity>
-                                )}
+
+                                    {selectedAlbumIds.size > 0 && (
+                                        <TouchableOpacity
+                                            style={styles.batchRemoveBtn}
+                                            onPress={handleBatchRemoveFromHome}
+                                        >
+                                            <Text style={styles.batchRemoveBtnText}>
+                                                {`✕ 홈에서 없애기 (${selectedAlbumIds.size})`}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+
+                        {memoryList.length === 0 ? (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyText}>현재 작업 중인 추억 앨범이 없습니다.</Text>
+                                <Text style={[styles.emptyText, { fontSize: 11, marginTop: 4, color: '#94a3b8' }]}>
+                                    새 사진을 등록하거나 보관함 탭에서 앨범을 복원해보세요.
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.albumGrid}>
+                                {memoryList.map((item) => {
+                                    const isSelected = selectedAlbumIds.has(item.id);
+
+                                    return (
+                                        <View key={item.id} style={styles.albumItemOuter}>
+                                            <DroppableAlbumCard
+                                                item={item}
+                                                isSelected={selectedEnhanceMemory?.id === item.id}
+                                                onDropFiles={handleDropFilesOnAlbum}
+                                            >
+                                                <View style={styles.albumHeaderRow}>
+                                                    <View style={styles.leftMetaGroup}>
+                                                        <TouchableOpacity
+                                                            style={[
+                                                                styles.checkbox,
+                                                                isSelected && styles.checkboxActive,
+                                                            ]}
+                                                            onPress={() => {
+                                                                setSelectedAlbumIds((prev) => {
+                                                                    const next = new Set(prev);
+                                                                    if (next.has(item.id)) next.delete(item.id);
+                                                                    else next.add(item.id);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                style={[
+                                                                    styles.checkmark,
+                                                                    isSelected && styles.checkmarkActive,
+                                                                ]}
+                                                            >
+                                                                {isSelected ? '✓' : ''}
+                                                            </Text>
+                                                        </TouchableOpacity>
+
+                                                        <View style={styles.badgeGroup}>
+                                                            <Text
+                                                                style={[
+                                                                    styles.modeBadge,
+                                                                    item.mode === 'travel' && styles.modeBadgeTravel,
+                                                                ]}
+                                                            >
+                                                                {item.mode === 'travel'
+                                                                    ? '✈️ 여행'
+                                                                    : item.mode === 'childhood'
+                                                                      ? '🧸 유년시절'
+                                                                      : '❓ 분류 미정'}
+                                                            </Text>
+                                                            <Text style={styles.categoryBadge}>
+                                                                {item.categoryFolder || '미분류'}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    <View style={styles.cardActions}>
+                                                        <TouchableOpacity
+                                                            style={[styles.miniBtn, styles.galleryBtn]}
+                                                            onPress={() => setViewingGalleryAlbum(item)}
+                                                        >
+                                                            <Text style={styles.galleryBtnText}>🖼️ 사진 관리</Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={[styles.miniBtn, styles.editDetailBtn]}
+                                                            onPress={() => setEditingAlbum(item)}
+                                                        >
+                                                            <Text style={styles.editDetailBtnText}>✏️ 상세 편집</Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={[styles.miniBtn, styles.interviewBtn]}
+                                                            onPress={() => handleOpenInterviewForExistingAlbum(item)}
+                                                        >
+                                                            <Text style={styles.interviewBtnText}>
+                                                                💬 인터뷰 수정/재분석
+                                                            </Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={styles.miniBtn}
+                                                            onPress={() => {
+                                                                setSelectedEnhanceMemory(item);
+                                                                router.push('/(tabs)/enhance');
+                                                            }}
+                                                        >
+                                                            <Text style={styles.miniBtnText}>🎨 화질 복원</Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={[styles.miniBtn, styles.deleteBtn]}
+                                                            onPress={() =>
+                                                                handleRemoveSingleFromHome(
+                                                                    item.id,
+                                                                    item.curatedNote?.title || item.analysis?.title,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Text style={[styles.miniBtnText, { color: '#ef4444' }]}>
+                                                                ✕ 홈에서 없애기
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+
+                                                <Text style={styles.albumTitle}>
+                                                    {item.curatedNote?.title || item.analysis?.title || '추억의 순간'}
+                                                </Text>
+
+                                                <ScrollView
+                                                    horizontal
+                                                    showsHorizontalScrollIndicator={false}
+                                                    style={styles.thumbStrip}
+                                                >
+                                                    {item.imageUrls?.map((url, i) => (
+                                                        <TouchableOpacity
+                                                            key={i}
+                                                            activeOpacity={0.8}
+                                                            onPress={() => setViewingGalleryAlbum(item)}
+                                                        >
+                                                            <Image
+                                                                source={{ uri: url }}
+                                                                style={styles.albumThumbImage}
+                                                            />
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+
+                                                <Text style={styles.albumDesc} numberOfLines={3}>
+                                                    {item.curatedNote
+                                                        ? `[그날의 장면] ${item.curatedNote.sceneDescription}\n[나의 기억] ${item.curatedNote.remembered}`
+                                                        : item.analysis?.description ||
+                                                          item.analysis?.storyCaption ||
+                                                          '내용 없음'}
+                                                </Text>
+                                            </DroppableAlbumCard>
+                                        </View>
+                                    );
+                                })}
                             </View>
                         )}
                     </View>
-
-                    {memoryList.length === 0 ? (
-                        <View style={styles.emptyBox}>
-                            <Text style={styles.emptyText}>현재 작업 중인 추억 앨범이 없습니다.</Text>
-                            <Text style={[styles.emptyText, { fontSize: 11, marginTop: 4, color: '#94a3b8' }]}>
-                                새 사진을 등록하거나 보관함 탭에서 앨범을 복원해보세요.
-                            </Text>
-                        </View>
-                    ) : (
-                        memoryList.map((item) => {
-                            const isSelected = selectedAlbumIds.has(item.id);
-
-                            return (
-                                <View key={item.id} style={styles.albumItemOuter}>
-                                    <DroppableAlbumCard
-                                        item={item}
-                                        isSelected={selectedEnhanceMemory?.id === item.id}
-                                        onDropFiles={handleDropFilesOnAlbum}
-                                    >
-                                        <View style={styles.albumHeaderRow}>
-                                            <View style={styles.leftMetaGroup}>
-                                                <TouchableOpacity
-                                                    style={[styles.checkbox, isSelected && styles.checkboxActive]}
-                                                    onPress={() => {
-                                                        setSelectedAlbumIds((prev) => {
-                                                            const next = new Set(prev);
-                                                            if (next.has(item.id)) next.delete(item.id);
-                                                            else next.add(item.id);
-                                                            return next;
-                                                        });
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={[styles.checkmark, isSelected && styles.checkmarkActive]}
-                                                    >
-                                                        {isSelected ? '✓' : ''}
-                                                    </Text>
-                                                </TouchableOpacity>
-
-                                                <View style={styles.badgeGroup}>
-                                                    <Text
-                                                        style={[
-                                                            styles.modeBadge,
-                                                            item.mode === 'travel' && styles.modeBadgeTravel,
-                                                        ]}
-                                                    >
-                                                        {item.mode === 'travel'
-                                                            ? '✈️ 여행'
-                                                            : item.mode === 'childhood'
-                                                              ? '🧸 유년시절'
-                                                              : '❓ 분류 미정'}
-                                                    </Text>
-                                                    <Text style={styles.categoryBadge}>
-                                                        {item.categoryFolder || '미분류'}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <View style={styles.cardActions}>
-                                                <TouchableOpacity
-                                                    style={[styles.miniBtn, styles.galleryBtn]}
-                                                    onPress={() => setViewingGalleryAlbum(item)}
-                                                >
-                                                    <Text style={styles.galleryBtnText}>🖼️ 사진 관리</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={[styles.miniBtn, styles.editDetailBtn]}
-                                                    onPress={() => setEditingAlbum(item)}
-                                                >
-                                                    <Text style={styles.editDetailBtnText}>✏️ 상세 편집</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={[styles.miniBtn, styles.interviewBtn]}
-                                                    onPress={() => handleOpenInterviewForExistingAlbum(item)}
-                                                >
-                                                    <Text style={styles.interviewBtnText}>💬 인터뷰 수정/재분석</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={styles.miniBtn}
-                                                    onPress={() => {
-                                                        setSelectedEnhanceMemory(item);
-                                                        router.push('/(tabs)/enhance');
-                                                    }}
-                                                >
-                                                    <Text style={styles.miniBtnText}>🎨 화질 복원</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={[styles.miniBtn, styles.deleteBtn]}
-                                                    onPress={() =>
-                                                        handleRemoveSingleFromHome(
-                                                            item.id,
-                                                            item.curatedNote?.title || item.analysis?.title,
-                                                        )
-                                                    }
-                                                >
-                                                    <Text style={[styles.miniBtnText, { color: '#ef4444' }]}>
-                                                        ✕ 홈에서 없애기
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-
-                                        <Text style={styles.albumTitle}>
-                                            {item.curatedNote?.title || item.analysis?.title || '추억의 순간'}
-                                        </Text>
-
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            style={styles.thumbStrip}
-                                        >
-                                            {item.imageUrls?.map((url, i) => (
-                                                <TouchableOpacity
-                                                    key={i}
-                                                    activeOpacity={0.8}
-                                                    onPress={() => setViewingGalleryAlbum(item)}
-                                                >
-                                                    <Image source={{ uri: url }} style={styles.albumThumbImage} />
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-
-                                        <Text style={styles.albumDesc} numberOfLines={3}>
-                                            {item.curatedNote
-                                                ? `[그날의 장면] ${item.curatedNote.sceneDescription}\n[나의 기억] ${item.curatedNote.remembered}`
-                                                : item.analysis?.description ||
-                                                  item.analysis?.storyCaption ||
-                                                  '내용 없음'}
-                                        </Text>
-                                    </DroppableAlbumCard>
-                                </View>
-                            );
-                        })
-                    )}
                 </View>
             </ScrollView>
 
@@ -717,9 +737,7 @@ export default function IndexScreen() {
                     imageUrls={
                         activeEditingMemory
                             ? activeEditingMemory.imageUrls
-                            : selectedImages
-                                  .map((image) => image.uri)
-                                  .filter((uri): uri is string => Boolean(uri))
+                            : selectedImages.map((image) => image.uri).filter((uri): uri is string => Boolean(uri))
                     }
                     initialAnswers={initialAnswers}
                     initialExtraStory={initialExtraStory}
@@ -745,42 +763,75 @@ export default function IndexScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f8fafc' },
-    header: {
-        paddingTop: 40,
-        paddingHorizontal: 20,
-        paddingBottom: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+    container: { flex: 1, backgroundColor: memoryColors.canvas },
+    scrollContent: { paddingBottom: 64 },
+    pageShell: {
+        width: '100%',
+        maxWidth: 1440,
+        alignSelf: 'center',
+        paddingHorizontal: memoryLayout.desktopPadding,
+        paddingTop: 28,
     },
-    headerTitle: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
-    headerSubtitle: { fontSize: 13, color: '#64748b', marginTop: 4 },
-    scrollContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 },
-    cardHeaderRow: { marginBottom: 14 },
-    cardTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
-    cardHeaderHint: { fontSize: 12, color: '#64748b', marginTop: 4 },
+    pageShellNarrow: {
+        paddingHorizontal: memoryLayout.mobilePadding,
+        paddingTop: 22,
+    },
+    uploadWorkspace: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 24,
+        marginBottom: 24,
+    },
+    uploadWorkspaceNarrow: { flexDirection: 'column' },
+    uploadColumn: { width: 420, flexShrink: 0 },
+    fullWidthColumn: { width: '100%' },
+    contextCard: {
+        flex: 1,
+        minWidth: 0,
+        backgroundColor: memoryColors.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        padding: 24,
+    },
+    cardHeaderRow: { marginBottom: 16 },
+    cardTitle: {
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+        color: memoryColors.text,
+        fontFamily: memoryFontFamily,
+    },
     largeDropZone: {
-        minHeight: 160,
-        borderWidth: 2,
-        borderColor: '#cbd5e1',
-        borderStyle: 'dashed',
+        minHeight: 200,
         borderRadius: 12,
-        backgroundColor: '#f8fafc',
+        backgroundColor: memoryColors.brandLight,
         padding: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     dropZoneEmptyClickable: {
         width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 24,
+        minHeight: 168,
     },
-    dropZoneIcon: { fontSize: 36, marginBottom: 8 },
-    dropZonePrimaryText: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 4 },
-    dropZoneSubText: { fontSize: 12, color: '#94a3b8' },
+    dropZoneIcon: { fontSize: 22, color: memoryColors.brand, marginBottom: 8 },
+    dropZonePrimaryText: {
+        fontSize: 14,
+        lineHeight: 24,
+        fontWeight: '700',
+        color: memoryColors.brand,
+        marginBottom: 4,
+        fontFamily: memoryFontFamily,
+    },
+    dropZoneSubText: {
+        fontSize: 12,
+        lineHeight: 20,
+        color: memoryColors.textMuted,
+        fontFamily: memoryFontFamily,
+    },
     previewGridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -793,14 +844,14 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         position: 'relative',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: memoryColors.border,
     },
     previewGridImage: { width: '100%', height: '100%', borderRadius: 10 },
     removeBadge: {
         position: 'absolute',
         top: -6,
         right: -6,
-        backgroundColor: '#ef4444',
+        backgroundColor: memoryColors.danger,
         width: 22,
         height: 22,
         borderRadius: 11,
@@ -808,7 +859,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 10,
         borderWidth: 1.5,
-        borderColor: '#fff',
+        borderColor: memoryColors.surface,
     },
     removeBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
     addMoreGridBtn: {
@@ -816,63 +867,136 @@ const styles = StyleSheet.create({
         height: 90,
         borderRadius: 10,
         borderWidth: 1.5,
-        borderColor: '#94a3b8',
+        borderColor: memoryColors.textFaint,
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: memoryColors.surface,
     },
-    addMoreGridIcon: { fontSize: 24, color: '#64748b' },
-    addMoreGridText: { fontSize: 11, color: '#64748b', fontWeight: '600', marginTop: 2 },
-    optionRow: { marginBottom: 12 },
+    addMoreGridIcon: { fontSize: 24, color: memoryColors.textMuted },
+    addMoreGridText: {
+        fontSize: 11,
+        color: memoryColors.textMuted,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    fileTypeHint: {
+        fontSize: 12,
+        lineHeight: 20,
+        color: memoryColors.textMuted,
+        marginBottom: 12,
+        fontFamily: memoryFontFamily,
+    },
+    fileSelectBtn: {
+        minHeight: 40,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+        backgroundColor: memoryColors.surface,
+    },
+    fileSelectBtnText: {
+        fontSize: 13,
+        color: memoryColors.textSecondary,
+        fontWeight: '500',
+    },
+    optionRow: { marginBottom: 16 },
     audioChip: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#eff6ff',
-        padding: 8,
+        backgroundColor: memoryColors.brandLight,
+        minHeight: 40,
+        paddingHorizontal: 12,
         borderRadius: 8,
     },
-    audioChipText: { fontSize: 12, color: '#1d4ed8' },
-    audioRemoveText: { color: '#ef4444', fontWeight: 'bold', marginLeft: 8 },
-    audioAddBtn: { padding: 8, backgroundColor: '#f1f5f9', borderRadius: 8, alignItems: 'center' },
-    audioAddBtnText: { fontSize: 12, color: '#475569', fontWeight: '600' },
-    folderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-    folderLabel: { fontSize: 12, fontWeight: '600', color: '#475569', marginRight: 6 },
+    audioChipText: { fontSize: 12, color: memoryColors.brandDark },
+    audioRemoveText: {
+        color: memoryColors.danger,
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+    audioAddBtn: {
+        minHeight: 40,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: memoryColors.surface,
+    },
+    audioAddBtnText: {
+        fontSize: 12,
+        color: memoryColors.textSecondary,
+        fontWeight: '500',
+    },
+    folderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingTop: 8,
+    },
+    folderLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: memoryColors.textSecondary,
+    },
     folderChip: {
         paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 12,
-        backgroundColor: '#f1f5f9',
-        marginRight: 6,
+        paddingVertical: 7,
+        borderRadius: 999,
+        backgroundColor: memoryColors.subtle,
     },
-    folderChipActive: { backgroundColor: '#0284c7' },
-    folderChipText: { fontSize: 12, color: '#475569' },
-    folderChipTextActive: { color: '#ffffff', fontWeight: '600' },
-    actionSubmitBtn: { backgroundColor: '#0284c7', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
-    actionSubmitBtnDisabled: { backgroundColor: '#94a3b8' },
-    actionSubmitBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    folderChipActive: { backgroundColor: memoryColors.brandLight },
+    folderChipText: { fontSize: 12, color: memoryColors.textSecondary },
+    folderChipTextActive: { color: memoryColors.brand, fontWeight: '700' },
+    actionSubmitBtn: {
+        width: 260,
+        maxWidth: '100%',
+        backgroundColor: memoryColors.brand,
+        paddingVertical: 13,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    actionSubmitBtnDisabled: { backgroundColor: memoryColors.textFaint },
+    actionSubmitBtnText: {
+        color: memoryColors.surface,
+        fontWeight: '700',
+        fontSize: 14,
+    },
     loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    albumSection: { marginTop: 8 },
+    albumSection: { marginTop: 2 },
     sectionHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 18,
         flexWrap: 'wrap',
         gap: 8,
     },
-    sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a' },
+    sectionTitle: {
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+        color: memoryColors.text,
+    },
     toolbarGroup: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     selectToggleBtn: {
-        backgroundColor: '#f1f5f9',
+        backgroundColor: memoryColors.surface,
         borderWidth: 1,
-        borderColor: '#cbd5e1',
+        borderColor: memoryColors.border,
         paddingVertical: 5,
         paddingHorizontal: 10,
         borderRadius: 6,
     },
-    selectToggleBtnText: { fontSize: 11, fontWeight: '700', color: '#475569' },
+    selectToggleBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: memoryColors.textSecondary,
+    },
     batchRemoveBtn: {
         backgroundColor: '#fee2e2',
         borderWidth: 1,
@@ -883,15 +1007,16 @@ const styles = StyleSheet.create({
     },
     batchRemoveBtnText: { fontSize: 11, fontWeight: '700', color: '#dc2626' },
     emptyBox: {
-        backgroundColor: '#fff',
+        backgroundColor: memoryColors.surface,
         padding: 24,
         borderRadius: 12,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: memoryColors.border,
     },
-    emptyText: { fontSize: 13, color: '#94a3b8' },
-    albumItemOuter: { marginBottom: 12 },
+    emptyText: { fontSize: 13, color: memoryColors.textFaint },
+    albumGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+    albumItemOuter: { flexGrow: 1, flexBasis: 400, minWidth: 300, maxWidth: 664 },
     albumHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -906,12 +1031,15 @@ const styles = StyleSheet.create({
         height: 20,
         borderRadius: 4,
         borderWidth: 1.5,
-        borderColor: '#94a3b8',
-        backgroundColor: '#fff',
+        borderColor: memoryColors.textFaint,
+        backgroundColor: memoryColors.surface,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    checkboxActive: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
+    checkboxActive: {
+        backgroundColor: memoryColors.brand,
+        borderColor: memoryColors.brand,
+    },
     checkmark: { fontSize: 11, color: 'transparent', fontWeight: 'bold' },
     checkmarkActive: { color: '#fff' },
     badgeGroup: { flexDirection: 'row', gap: 6 },
@@ -925,29 +1053,70 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     modeBadgeTravel: {
-        color: '#0369a1',
-        backgroundColor: '#e0f2fe',
+        color: memoryColors.brandDark,
+        backgroundColor: memoryColors.brandLight,
     },
     categoryBadge: {
         fontSize: 11,
-        color: '#475569',
-        backgroundColor: '#f1f5f9',
+        color: memoryColors.textSecondary,
+        backgroundColor: memoryColors.subtle,
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
     },
     cardActions: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-    miniBtn: { paddingVertical: 5, paddingHorizontal: 9, borderRadius: 6, backgroundColor: '#f1f5f9' },
-    galleryBtn: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1' },
-    galleryBtnText: { fontSize: 11, color: '#334155', fontWeight: '700' },
-    editDetailBtn: { backgroundColor: '#f0f9ff', borderWidth: 1, borderColor: '#bae6fd' },
-    editDetailBtnText: { fontSize: 11, color: '#0284c7', fontWeight: '700' },
-    interviewBtn: { backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' },
+    miniBtn: {
+        paddingVertical: 6,
+        paddingHorizontal: 9,
+        borderRadius: 6,
+        backgroundColor: memoryColors.subtle,
+    },
+    galleryBtn: {
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+    },
+    galleryBtnText: {
+        fontSize: 11,
+        color: memoryColors.textSecondary,
+        fontWeight: '700',
+    },
+    editDetailBtn: {
+        backgroundColor: memoryColors.brandLight,
+        borderWidth: 1,
+        borderColor: memoryColors.brandBorder,
+    },
+    editDetailBtnText: {
+        fontSize: 11,
+        color: memoryColors.brand,
+        fontWeight: '700',
+    },
+    interviewBtn: {
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+    },
     interviewBtnText: { fontSize: 11, color: '#1d4ed8', fontWeight: '700' },
-    deleteBtn: { backgroundColor: '#fef2f2' },
-    miniBtnText: { fontSize: 11, color: '#475569', fontWeight: '600' },
-    albumTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+    deleteBtn: { backgroundColor: memoryColors.dangerLight },
+    miniBtnText: {
+        fontSize: 11,
+        color: memoryColors.textSecondary,
+        fontWeight: '600',
+    },
+    albumTitle: {
+        fontSize: 16,
+        lineHeight: 24,
+        color: memoryColors.text,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
     thumbStrip: { flexDirection: 'row', marginBottom: 8 },
-    albumThumbImage: { width: 64, height: 64, borderRadius: 6, marginRight: 6, backgroundColor: '#e2e8f0' },
-    albumDesc: { fontSize: 13, color: '#64748b', lineHeight: 18 },
+    albumThumbImage: {
+        width: 76,
+        height: 64,
+        borderRadius: 8,
+        marginRight: 8,
+        backgroundColor: memoryColors.border,
+    },
+    albumDesc: { fontSize: 13, color: memoryColors.textMuted, lineHeight: 20 },
 });

@@ -1,20 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import {
-    ActivityIndicator,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { MemoryItem } from '../../context/MemoryContext';
-import {
-    GeneratedNoteSourceItem,
-    GeneratedNoteStyle,
-    generateMemoryBookNote,
-} from '../../services/geminiService';
+import { GeneratedNoteSourceItem, GeneratedNoteStyle, generateMemoryBookNote } from '../../services/geminiService';
+import { memoryColors } from '../../constants/memoryTheme';
 
 interface NoteGenerationPanelProps {
     memories: MemoryItem[];
@@ -28,11 +17,7 @@ function limitText(value: string | undefined, maxLength: number): string {
     return (value || '').trim().slice(0, maxLength);
 }
 
-export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
-    memories,
-    onGenerated,
-    onCancel,
-}) => {
+export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({ memories, onGenerated, onCancel }) => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [style, setStyle] = useState<GeneratedNoteStyle>('warm');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -80,22 +65,14 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
                 location: limitText(memory.analysis?.location, 320),
                 yearEstimate: limitText(memory.analysis?.yearEstimate, 240),
                 categoryFolder: limitText(memory.categoryFolder, 160),
-                sceneDescription: limitText(
-                    memory.curatedNote?.sceneDescription || memory.analysis?.description,
-                    4000,
-                ),
-                remembered: limitText(
-                    memory.curatedNote?.remembered || memory.analysis?.storyCaption,
-                    6000,
-                ),
+                sceneDescription: limitText(memory.curatedNote?.sceneDescription || memory.analysis?.description, 4000),
+                remembered: limitText(memory.curatedNote?.remembered || memory.analysis?.storyCaption, 6000),
                 unremembered: limitText(memory.curatedNote?.unremembered, 3000),
                 reflection: limitText(memory.curatedNote?.reflection, 4000),
                 interviewAnswers: (memory.interviewData?.questions || [])
                     .filter((item) => item.answer?.trim())
                     .slice(0, 30)
-                    .map((item) =>
-                        limitText(`${item.question}\n답변: ${item.answer}`, 1200),
-                    ),
+                    .map((item) => limitText(`${item.question}\n답변: ${item.answer}`, 1200)),
             }));
 
             const generated = await generateMemoryBookNote(sources, style);
@@ -105,15 +82,11 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
             const fileNames = Array.from(
                 new Set(selectedMemories.flatMap((memory) => memory.fileNames || []).filter(Boolean)),
             );
-            const modeValues = Array.from(
-                new Set(selectedMemories.map((memory) => memory.mode).filter(Boolean)),
-            );
+            const modeValues = Array.from(new Set(selectedMemories.map((memory) => memory.mode).filter(Boolean)));
             const rootValues = Array.from(
                 new Set(selectedMemories.map((memory) => memory.rootCategory).filter(Boolean)),
             );
-            const fullStory = [generated.opening, generated.body, generated.closing]
-                .filter(Boolean)
-                .join('\n\n');
+            const fullStory = [generated.opening, generated.body, generated.closing].filter(Boolean).join('\n\n');
 
             const note: MemoryItem = {
                 id: `generated-note-${Date.now()}`,
@@ -167,9 +140,7 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
                 </View>
             ) : (
                 <>
-                    <Text style={styles.sectionLabel}>
-                        1. 노트에 담을 추억 선택 · 최대 {MAX_SELECTED_MEMORIES}개
-                    </Text>
+                    <Text style={styles.sectionLabel}>1. 노트에 담을 추억 선택 · 최대 {MAX_SELECTED_MEMORIES}개</Text>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -198,7 +169,11 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
                                             {title}
                                         </Text>
                                         <Text style={styles.memoryMeta} numberOfLines={1}>
-                                            {memory.mode === 'travel' ? '✈️ 여행' : '🧸 유년시절'}
+                                            {memory.mode === 'travel'
+                                                ? '✈️ 여행'
+                                                : memory.mode === 'childhood'
+                                                  ? '🧸 유년시절'
+                                                  : '❓ 미분류'}
                                             {' · '}
                                             {memory.imageUrls?.length || 0}장
                                         </Text>
@@ -227,7 +202,9 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
                             disabled={isGenerating}
                         >
                             <Text style={styles.styleTitle}>🗂️ 기록 중심</Text>
-                            <Text style={styles.styleDescription}>시기와 장소, 사건을 중심으로 담백하게 정리합니다.</Text>
+                            <Text style={styles.styleDescription}>
+                                시기와 장소, 사건을 중심으로 담백하게 정리합니다.
+                            </Text>
                         </TouchableOpacity>
                     </View>
 
@@ -261,17 +238,12 @@ export const NoteGenerationPanel: React.FC<NoteGenerationPanelProps> = ({
 
 const styles = StyleSheet.create({
     panel: {
-        marginHorizontal: 24,
-        marginTop: 18,
-        padding: 22,
-        backgroundColor: '#FFFFFF',
+        padding: 24,
+        backgroundColor: memoryColors.surface,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
-        shadowColor: '#1E3A8A',
-        shadowOpacity: 0.08,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 5 },
+        borderColor: memoryColors.border,
+        marginBottom: 16,
     },
     panelHeader: {
         flexDirection: 'row',
@@ -281,22 +253,51 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     headerCopy: { flex: 1 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-    title: { fontSize: 19, fontWeight: '900', color: '#172554' },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
+    title: {
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+        color: memoryColors.text,
+    },
     betaBadge: {
         fontSize: 10,
         fontWeight: '900',
-        color: '#1D4ED8',
-        backgroundColor: '#DBEAFE',
+        color: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
         paddingHorizontal: 7,
         paddingVertical: 3,
         borderRadius: 999,
         overflow: 'hidden',
     },
-    description: { marginTop: 5, fontSize: 13, lineHeight: 19, color: '#64748B' },
-    closeButton: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#F1F5F9' },
-    closeButtonText: { fontSize: 12, fontWeight: '700', color: '#475569' },
-    sectionLabel: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 9 },
+    description: {
+        marginTop: 5,
+        fontSize: 13,
+        lineHeight: 20,
+        color: memoryColors.textMuted,
+    },
+    closeButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: memoryColors.subtle,
+    },
+    closeButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: memoryColors.textSecondary,
+    },
+    sectionLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: memoryColors.text,
+        marginBottom: 12,
+    },
     memoryList: { gap: 10, paddingBottom: 18 },
     memoryCard: {
         width: 245,
@@ -304,18 +305,31 @@ const styles = StyleSheet.create({
         padding: 10,
         borderRadius: 12,
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        backgroundColor: '#F8FAFC',
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.surface,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
     },
-    memoryCardSelected: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
-    thumbnail: { width: 62, height: 62, borderRadius: 8, backgroundColor: '#E2E8F0' },
+    memoryCardSelected: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+    },
+    thumbnail: {
+        width: 62,
+        height: 62,
+        borderRadius: 8,
+        backgroundColor: '#E2E8F0',
+    },
     thumbnailFallback: { alignItems: 'center', justifyContent: 'center' },
     thumbnailFallbackText: { fontSize: 22 },
     memoryCopy: { flex: 1, gap: 6 },
-    memoryTitle: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: '#1E293B' },
+    memoryTitle: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '800',
+        color: '#1E293B',
+    },
     memoryMeta: { fontSize: 11, color: '#64748B' },
     checkCircle: {
         width: 21,
@@ -327,22 +341,43 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: '#FFFFFF',
     },
-    checkCircleSelected: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+    checkCircleSelected: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brand,
+    },
     checkText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
-    styleOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+    styleOptions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginBottom: 16,
+    },
     styleCard: {
         flexGrow: 1,
         flexBasis: 240,
         padding: 13,
         borderRadius: 10,
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        backgroundColor: '#F8FAFC',
+        borderColor: memoryColors.border,
+        backgroundColor: memoryColors.surface,
     },
-    styleCardActive: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+    styleCardActive: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+    },
     styleTitle: { fontSize: 13, fontWeight: '800', color: '#1E293B' },
-    styleDescription: { marginTop: 4, fontSize: 11, lineHeight: 17, color: '#64748B' },
-    errorText: { marginBottom: 12, fontSize: 12, color: '#DC2626', fontWeight: '700' },
+    styleDescription: {
+        marginTop: 4,
+        fontSize: 11,
+        lineHeight: 17,
+        color: '#64748B',
+    },
+    errorText: {
+        marginBottom: 12,
+        fontSize: 12,
+        color: '#DC2626',
+        fontWeight: '700',
+    },
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -351,11 +386,23 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     selectionText: { fontSize: 12, color: '#475569', fontWeight: '700' },
-    generateButton: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 9, backgroundColor: '#2563EB' },
+    generateButton: {
+        minWidth: 240,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 8,
+        backgroundColor: memoryColors.brand,
+        alignItems: 'center',
+    },
     generateButtonDisabled: { backgroundColor: '#94A3B8' },
     generateButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
     loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     noMemoryBox: { paddingVertical: 26, alignItems: 'center' },
     noMemoryTitle: { fontSize: 15, fontWeight: '800', color: '#475569' },
-    noMemoryDescription: { marginTop: 5, fontSize: 12, color: '#94A3B8', textAlign: 'center' },
+    noMemoryDescription: {
+        marginTop: 5,
+        fontSize: 12,
+        color: '#94A3B8',
+        textAlign: 'center',
+    },
 });

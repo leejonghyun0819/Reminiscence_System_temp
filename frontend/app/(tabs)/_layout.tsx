@@ -1,27 +1,19 @@
 // frontend/app/(tabs)/_layout.tsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Platform } from 'react-native';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
-    const router = useRouter();
-
     return (
         <Tabs
             screenOptions={{
                 tabBarActiveTintColor: Colors[colorScheme].tint,
-                headerShown: useClientOnlyValue(false, true),
-                headerRight: () => (
-                    <TouchableOpacity style={styles.storageBtn} onPress={() => router.push('/backup')}>
-                        <Text style={styles.storageBtnText}>📦 백업 보관함</Text>
-                    </TouchableOpacity>
-                ),
+                headerShown: false,
+                tabBarStyle: Platform.OS === 'web' ? { display: 'none' } : undefined,
             }}
         >
             <Tabs.Screen
@@ -78,20 +70,3 @@ export default function TabLayout() {
         </Tabs>
     );
 }
-
-const styles = StyleSheet.create({
-    storageBtn: {
-        marginRight: 16,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        backgroundColor: '#F4F4F5',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E4E4E7',
-    },
-    storageBtnText: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#3F3F46',
-    },
-});

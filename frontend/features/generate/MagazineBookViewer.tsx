@@ -1,6 +1,7 @@
 import React from 'react';
-import { Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { memoryColors, memoryFontFamily } from '../../constants/memoryTheme';
 import { MemoryItem } from '../../context/MemoryContext';
 import { MouseDragHorizontalScroll } from '../backup/MouseDragHorizontalScroll';
 
@@ -31,227 +32,196 @@ export const MagazineBookViewer: React.FC<MagazineBookViewerProps> = ({
 }) => {
     const generatedNote = note.generatedNote;
     const photoCount = note.imageUrls?.length || 0;
+    const previewTitle = note.analysis?.title || '제목 없음';
+    const previewStory = generatedNote
+        ? [generatedNote.opening, generatedNote.body, generatedNote.closing].filter(Boolean).join('\n\n')
+        : note.analysis?.storyCaption || note.analysis?.description || '';
+
+    const movePhoto = (direction: -1 | 1) => {
+        if (photoCount === 0) return;
+        setActivePhotoIdx((activePhotoIdx + direction + photoCount) % photoCount);
+    };
 
     return (
-        <View style={styles.bookWrapper}>
-            <View style={styles.bookHeaderRow}>
-                <View style={styles.tagGroup}>
-                    <Text style={styles.locationTag}>{`📍 ${note.analysis?.location || '장소 미정'}`}</Text>
-                    <Text style={styles.yearTag}>{`⏳ ${note.analysis?.yearEstimate || '시기 미정'}`}</Text>
-                    {note.categoryFolder ? <Text style={styles.folderTag}>{`📁 ${note.categoryFolder}`}</Text> : null}
-                    {generatedNote ? (
-                        <Text style={styles.sourceTag}>{`${generatedNote.sourceMemoryIds.length}개 추억 연결`}</Text>
-                    ) : null}
+        <View style={styles.workspace}>
+            <View style={styles.previewCard}>
+                <View style={styles.previewHeader}>
+                    <View style={styles.titleCopy}>
+                        <Text style={styles.bookMainTitle}>{previewTitle}</Text>
+                        <Text style={styles.bookSubtitle}>
+                            {generatedNote?.subtitle || '사진과 인터뷰 답변으로 완성한 소중한 기록'}
+                        </Text>
+                    </View>
+                    {generatedNote ? <Text style={styles.styleBadge}>따뜻한 에세이</Text> : null}
                 </View>
 
-                <View style={styles.cardHeaderBtnGroup}>
-                    {isEditing ? (
-                        <TouchableOpacity style={styles.saveBtn} onPress={onSaveEdit}>
-                            <Text style={styles.saveBtnText}>💾 편집 완료 저장</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}>
-                            <Text style={styles.editBtnText}>✏️ 직접 편집</Text>
-                        </TouchableOpacity>
-                    )}
+                <View style={styles.previewBody}>
+                    <View style={styles.photoColumn}>
+                        <View style={styles.mainPhotoBox}>
+                            {photoCount > 0 ? (
+                                <Image
+                                    source={{ uri: note.imageUrls[activePhotoIdx] }}
+                                    style={styles.mainPhotoImage}
+                                    resizeMode="contain"
+                                />
+                            ) : (
+                                <View style={styles.noPhotoBox}>
+                                    <Text style={styles.noPhotoIcon}>📷</Text>
+                                    <Text style={styles.noPhotoText}>연결된 사진이 없습니다.</Text>
+                                </View>
+                            )}
+                            <Text style={styles.photoCounterBadge}>
+                                {`추억 사진 · ${photoCount > 0 ? activePhotoIdx + 1 : 0} / ${photoCount}`}
+                            </Text>
+                        </View>
+
+                        <View style={styles.photoControls}>
+                            <TouchableOpacity style={styles.photoNavButton} onPress={() => movePhoto(-1)}>
+                                <Text style={styles.photoNavText}>← 이전</Text>
+                            </TouchableOpacity>
+                            <Text
+                                style={styles.photoCountText}
+                            >{`${photoCount > 0 ? activePhotoIdx + 1 : 0} / ${photoCount}`}</Text>
+                            <TouchableOpacity style={styles.photoNavButton} onPress={() => movePhoto(1)}>
+                                <Text style={styles.photoNavText}>다음 →</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {photoCount > 1 ? (
+                            <MouseDragHorizontalScroll contentContainerStyle={styles.thumbnailStrip}>
+                                {note.imageUrls.map((url, index) => (
+                                    <TouchableOpacity
+                                        key={`${url}-${index}`}
+                                        onPress={() => setActivePhotoIdx(index)}
+                                        style={[styles.thumbItem, activePhotoIdx === index && styles.thumbItemActive]}
+                                    >
+                                        <Image source={{ uri: url }} style={styles.thumbImg} />
+                                    </TouchableOpacity>
+                                ))}
+                            </MouseDragHorizontalScroll>
+                        ) : null}
+                    </View>
+
+                    <View style={styles.storyColumn}>
+                        <Text style={styles.storyHeading}>함께여서 기억나는 날</Text>
+                        <Text style={styles.storyContent}>{previewStory}</Text>
+                        <View style={styles.metaList}>
+                            <Text style={styles.metaText}>{`장소 · ${note.analysis?.location || '장소 미정'}`}</Text>
+                            <Text
+                                style={styles.metaText}
+                            >{`시기 · ${note.analysis?.yearEstimate || '시기 미정'}`}</Text>
+                            {note.categoryFolder ? (
+                                <Text style={styles.metaText}>{`보관 폴더 · ${note.categoryFolder}`}</Text>
+                            ) : null}
+                        </View>
+                    </View>
                 </View>
             </View>
 
-            {isEditing ? (
+            <View style={styles.editorCard}>
+                <Text style={styles.editorTitle}>노트 편집</Text>
+
+                <Text style={styles.inputLabel}>노트 제목</Text>
                 <TextInput
-                    style={styles.editTitleInput}
+                    style={[styles.titleInput, !isEditing && styles.inputReadOnly]}
                     value={editTitle}
                     onChangeText={setEditTitle}
-                    placeholder="추억 제목을 입력하세요"
+                    editable={isEditing}
+                    placeholder="노트 제목을 입력하세요"
+                    placeholderTextColor={memoryColors.textFaint}
                 />
-            ) : (
-                <>
-                    <Text style={styles.bookMainTitle}>{note.analysis?.title || '제목 없음'}</Text>
-                    {generatedNote?.subtitle ? <Text style={styles.bookSubtitle}>{generatedNote.subtitle}</Text> : null}
-                </>
-            )}
 
-            <View style={styles.mainPhotoBox}>
-                {photoCount > 0 ? (
-                    <Image
-                        source={{ uri: note.imageUrls[activePhotoIdx] }}
-                        style={styles.mainPhotoImage}
-                        resizeMode="contain"
-                    />
-                ) : (
-                    <View style={styles.noPhotoBox}>
-                        <Text style={styles.noPhotoIcon}>📷</Text>
-                        <Text style={styles.noPhotoText}>연결된 사진이 없습니다.</Text>
-                    </View>
-                )}
-                <Text style={styles.photoCounterBadge}>{`${photoCount > 0 ? activePhotoIdx + 1 : 0} / ${photoCount}`}</Text>
-            </View>
-
-            {photoCount > 0 ? (
-                <View style={styles.thumbStripWrapper}>
-                    <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                        {note.imageUrls.map((url, index) => (
-                            <TouchableOpacity
-                                key={`${url}-${index}`}
-                                onPress={() => setActivePhotoIdx(index)}
-                                style={[styles.thumbItem, activePhotoIdx === index && styles.thumbItemActive]}
-                            >
-                                <Image source={{ uri: url }} style={styles.thumbImg} />
-                                <Text style={styles.thumbNumberBadge}>{index + 1}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </MouseDragHorizontalScroll>
-                </View>
-            ) : null}
-
-            <View style={styles.sectionDivider} />
-
-            <View style={styles.storySection}>
-                <Text style={styles.storySectionTitle}>
-                    {generatedNote ? '✨ AI가 엮은 이야기' : '📖 그날의 이야기'}
-                </Text>
+                <Text style={styles.inputLabel}>이야기</Text>
+                <TextInput
+                    style={[styles.storyInput, !isEditing && styles.inputReadOnly]}
+                    value={editStory}
+                    onChangeText={setEditStory}
+                    editable={isEditing}
+                    multiline
+                    textAlignVertical="top"
+                    placeholder="추억 이야기를 적어주세요"
+                    placeholderTextColor={memoryColors.textFaint}
+                />
 
                 {isEditing ? (
-                    <TextInput
-                        style={styles.editStoryInput}
-                        value={editStory}
-                        onChangeText={setEditStory}
-                        multiline
-                        placeholder="추억 이야기를 적어주세요"
-                    />
-                ) : generatedNote ? (
-                    <View style={styles.generatedStory}>
-                        {generatedNote.opening ? <Text style={styles.openingText}>{generatedNote.opening}</Text> : null}
-                        <Text style={styles.storyContentText}>{generatedNote.body}</Text>
-                        {generatedNote.closing ? (
-                            <View style={styles.closingBox}>
-                                <Text style={styles.closingLabel}>마지막 페이지</Text>
-                                <Text style={styles.closingText}>{generatedNote.closing}</Text>
-                            </View>
-                        ) : null}
-                        {generatedNote.keywords.length > 0 ? (
-                            <View style={styles.keywordRow}>
-                                {generatedNote.keywords.map((keyword) => (
-                                    <Text key={keyword} style={styles.keywordTag}>{`#${keyword}`}</Text>
-                                ))}
-                            </View>
-                        ) : null}
-                    </View>
+                    <TouchableOpacity style={styles.primaryButton} onPress={onSaveEdit}>
+                        <Text style={styles.primaryButtonText}>수정 내용 적용</Text>
+                    </TouchableOpacity>
                 ) : (
-                    <Text style={styles.storyContentText}>
-                        {note.analysis?.storyCaption || note.analysis?.description || ''}
-                    </Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => setIsEditing(true)}>
+                        <Text style={styles.primaryButtonText}>직접 편집하기</Text>
+                    </TouchableOpacity>
                 )}
-            </View>
 
-            {note.analysis?.audioTranscriptSummary ? (
-                <View style={styles.audioVoiceBox}>
-                    <Text style={styles.audioVoiceTitle}>🎙️ 그날의 음성 기록</Text>
-                    <Text style={styles.audioVoiceContent}>{`“${note.analysis.audioTranscriptSummary}”`}</Text>
+                <View style={styles.sourceInfo}>
+                    <Text style={styles.sourceInfoText}>
+                        {generatedNote
+                            ? `출처 추억 ${generatedNote.sourceMemoryIds.length}개 · 사진 ${photoCount}장`
+                            : `연결 사진 ${photoCount}장 · 인터뷰 기반 기록`}
+                    </Text>
                 </View>
-            ) : null}
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    bookWrapper: {
-        maxWidth: 860,
+    workspace: {
         width: '100%',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 36,
-        shadowColor: '#0F172A',
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 6 },
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: 24,
     },
-    bookHeaderRow: {
+    previewCard: {
+        flexGrow: 1,
+        flexBasis: 720,
+        minWidth: 300,
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 16,
+        padding: 24,
+    },
+    previewHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-        flexWrap: 'wrap',
-        gap: 10,
+        alignItems: 'flex-start',
+        gap: 16,
+        marginBottom: 24,
     },
-    tagGroup: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', flex: 1 },
-    locationTag: {
-        backgroundColor: '#F1F5F9',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#334155',
-    },
-    yearTag: {
-        backgroundColor: '#F1F5F9',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#334155',
-    },
-    folderTag: {
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#B45309',
-    },
-    sourceTag: {
-        backgroundColor: '#DBEAFE',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: '800',
-        color: '#1D4ED8',
-    },
-    cardHeaderBtnGroup: { flexDirection: 'row', gap: 8 },
-    editBtn: {
-        backgroundColor: '#F1F5F9',
-        borderWidth: 1,
-        borderColor: '#CBD5E1',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    editBtnText: { fontSize: 12, fontWeight: '700', color: '#334155' },
-    saveBtn: { backgroundColor: '#16A34A', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },
-    saveBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+    titleCopy: { flex: 1 },
     bookMainTitle: {
+        color: memoryColors.text,
         fontSize: 28,
-        fontWeight: '900',
-        color: '#172554',
-        textAlign: 'center',
-        lineHeight: 37,
+        lineHeight: 40,
+        fontWeight: '700',
+        fontFamily: memoryFontFamily,
     },
     bookSubtitle: {
-        marginTop: 8,
-        marginBottom: 24,
+        color: memoryColors.textMuted,
         fontSize: 14,
-        lineHeight: 21,
-        color: '#64748B',
-        textAlign: 'center',
+        lineHeight: 24,
+        marginTop: 6,
+        fontFamily: memoryFontFamily,
     },
-    editTitleInput: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: '#1E293B',
-        textAlign: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: '#2563EB',
-        paddingBottom: 6,
-        marginBottom: 24,
+    styleBadge: {
+        color: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: '700',
+        overflow: 'hidden',
     },
+    previewBody: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+    photoColumn: { flexGrow: 1, flexBasis: 330, minWidth: 260 },
+    storyColumn: { flexGrow: 1, flexBasis: 320, minWidth: 260, paddingTop: 4 },
     mainPhotoBox: {
         width: '100%',
-        height: 380,
-        backgroundColor: '#18181B',
+        height: 360,
+        backgroundColor: memoryColors.brandLight,
         borderRadius: 12,
         overflow: 'hidden',
         position: 'relative',
@@ -259,103 +229,151 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     mainPhotoImage: { width: '100%', height: '100%' },
-    noPhotoBox: { alignItems: 'center', gap: 7 },
+    noPhotoBox: { alignItems: 'center', gap: 8 },
     noPhotoIcon: { fontSize: 36 },
-    noPhotoText: { color: '#CBD5E1', fontSize: 12 },
+    noPhotoText: { color: memoryColors.textMuted, fontSize: 12 },
     photoCounterBadge: {
         position: 'absolute',
-        bottom: 12,
-        right: 12,
-        backgroundColor: 'rgba(0,0,0,0.65)',
-        color: '#FFFFFF',
+        left: 16,
+        bottom: 16,
+        color: memoryColors.brand,
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
         fontSize: 12,
         fontWeight: '700',
+        overflow: 'hidden',
     },
-    thumbStripWrapper: { marginTop: 14, width: '100%' },
+    photoControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginTop: 16,
+    },
+    photoNavButton: {
+        minWidth: 100,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 8,
+        alignItems: 'center',
+        backgroundColor: memoryColors.surface,
+    },
+    photoNavText: {
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    photoCountText: {
+        color: memoryColors.textMuted,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    thumbnailStrip: { gap: 8, paddingTop: 12 },
     thumbItem: {
-        position: 'relative',
-        width: 75,
-        height: 55,
+        width: 64,
+        height: 48,
         borderRadius: 6,
         overflow: 'hidden',
         borderWidth: 2,
-        borderColor: '#E2E8F0',
+        borderColor: memoryColors.border,
     },
-    thumbItemActive: { borderColor: '#2563EB' },
+    thumbItemActive: { borderColor: memoryColors.brand },
     thumbImg: { width: '100%', height: '100%' },
-    thumbNumberBadge: {
-        position: 'absolute',
-        bottom: 2,
-        right: 2,
-        backgroundColor: 'rgba(0,0,0,0.65)',
-        color: '#FFFFFF',
-        fontSize: 9,
-        paddingHorizontal: 3,
-        borderRadius: 3,
+    storyHeading: {
+        color: memoryColors.text,
+        fontSize: 20,
+        lineHeight: 30,
         fontWeight: '700',
+        marginBottom: 12,
     },
-    sectionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 28 },
-    storySection: { gap: 13 },
-    storySectionTitle: { fontSize: 18, fontWeight: '900', color: '#1D4ED8' },
-    generatedStory: { gap: 18 },
-    openingText: {
-        fontSize: 16,
-        color: '#334155',
-        lineHeight: 29,
-        fontWeight: '700',
-        fontFamily: Platform.OS === 'web' ? 'Georgia, serif' : undefined,
+    storyContent: {
+        color: memoryColors.textSecondary,
+        fontSize: 14,
+        lineHeight: 25,
     },
-    storyContentText: {
-        fontSize: 15,
-        color: '#334155',
-        lineHeight: 29,
-        fontFamily: Platform.OS === 'web' ? 'Georgia, serif' : undefined,
-    },
-    closingBox: {
-        marginTop: 4,
-        padding: 17,
-        backgroundColor: '#EFF6FF',
-        borderLeftWidth: 4,
-        borderLeftColor: '#2563EB',
-        borderRadius: 8,
-        gap: 6,
-    },
-    closingLabel: { fontSize: 11, fontWeight: '900', color: '#1D4ED8' },
-    closingText: { fontSize: 14, color: '#334155', lineHeight: 24 },
-    keywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    keywordTag: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#475569',
-        backgroundColor: '#F1F5F9',
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-        borderRadius: 999,
-    },
-    editStoryInput: {
-        fontSize: 15,
-        color: '#1E293B',
-        lineHeight: 26,
-        borderWidth: 1,
-        borderColor: '#CBD5E1',
-        borderRadius: 8,
-        padding: 14,
-        height: 220,
-        textAlignVertical: 'top',
-        backgroundColor: '#F8FAFC',
-    },
-    audioVoiceBox: {
+    metaList: {
+        borderTopWidth: 1,
+        borderTopColor: memoryColors.border,
         marginTop: 24,
-        backgroundColor: '#F0FDF4',
-        borderLeftWidth: 4,
-        borderLeftColor: '#22C55E',
-        padding: 16,
-        borderRadius: 8,
+        paddingTop: 16,
         gap: 6,
     },
-    audioVoiceTitle: { fontSize: 13, fontWeight: '800', color: '#15803D' },
-    audioVoiceContent: { fontSize: 14, color: '#166534', fontStyle: 'italic', lineHeight: 22 },
+    metaText: { color: memoryColors.textMuted, fontSize: 12, lineHeight: 20 },
+    editorCard: {
+        flexGrow: 1,
+        flexBasis: 380,
+        minWidth: 300,
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 16,
+        padding: 24,
+    },
+    editorTitle: {
+        color: memoryColors.text,
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+        marginBottom: 18,
+    },
+    inputLabel: {
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '500',
+        marginBottom: 6,
+    },
+    titleInput: {
+        minHeight: 44,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        color: memoryColors.text,
+        fontSize: 13,
+        marginBottom: 16,
+        backgroundColor: memoryColors.surface,
+    },
+    storyInput: {
+        minHeight: 220,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 12,
+        padding: 14,
+        color: memoryColors.text,
+        fontSize: 13,
+        lineHeight: 22,
+        backgroundColor: memoryColors.surface,
+        marginBottom: 14,
+    },
+    inputReadOnly: {
+        backgroundColor: memoryColors.subtle,
+        color: memoryColors.textSecondary,
+    },
+    primaryButton: {
+        minHeight: 44,
+        borderRadius: 8,
+        backgroundColor: memoryColors.brand,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryButtonText: {
+        color: memoryColors.surface,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    sourceInfo: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: memoryColors.border,
+    },
+    sourceInfoText: {
+        color: memoryColors.textMuted,
+        fontSize: 12,
+        lineHeight: 20,
+    },
 });

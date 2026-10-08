@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MemoryItem } from '../../context/MemoryContext';
 import { MouseDragHorizontalScroll } from '../backup/MouseDragHorizontalScroll';
+import { memoryColors } from '../../constants/memoryTheme';
 
 interface GenerateTabStripProps {
     generatedNotes: MemoryItem[];
@@ -25,7 +26,7 @@ export const GenerateTabStrip: React.FC<GenerateTabStripProps> = ({
 
     return (
         <View style={styles.noteTabStrip}>
-            <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingHorizontal: 24, paddingVertical: 4 }}>
+            <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
                 {generatedNotes.map((note, idx) => {
                     const isActive = activeNoteId === note.id;
                     const isSelected = selectedNoteIds.has(note.id);
@@ -73,9 +74,6 @@ export const GenerateTabStrip: React.FC<GenerateTabStripProps> = ({
 
 const styles = StyleSheet.create({
     noteTabStrip: {
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
         paddingVertical: 8,
     },
     tabCard: {
@@ -86,16 +84,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFC',
         borderRadius: 10,
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
+        borderColor: memoryColors.border,
         width: 220,
         gap: 8,
     },
     tabCardActive: {
-        borderColor: '#F5933C',
-        backgroundColor: '#FFFDF9',
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
     },
     tabCardSelected: {
-        borderColor: '#F5933C',
+        borderColor: memoryColors.brand,
     },
     checkbox: {
         width: 18,
@@ -108,13 +106,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     checkboxActive: {
-        backgroundColor: '#F5933C',
-        borderColor: '#F5933C',
+        backgroundColor: memoryColors.brand,
+        borderColor: memoryColors.brand,
     },
     checkmark: { fontSize: 10, color: 'transparent', fontWeight: '800' },
     checkmarkActive: { color: '#FFFFFF' },
     tabCardTitle: { fontSize: 13, fontWeight: '700', color: '#1E293B' },
-    tabCardTitleActive: { color: '#D97706' },
+    tabCardTitleActive: { color: memoryColors.brand },
     tabCardSub: { fontSize: 11, color: '#64748B', marginTop: 1 },
     tabDeleteBtn: {
         width: 20,

@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     TextInput,
     Modal,
+    useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMemory, AnalysisVersion } from '../context/MemoryContext';
@@ -19,6 +20,9 @@ import { CreateFolderModal } from '../features/backup/CreateFolderModal';
 import { MoveFolderModal } from '../features/MoveFolderModal';
 import { BackupDetailViewerModal, BackupAlbumMeta } from '../features/backup/BackupDetailViewerModal';
 import { isVideoUrl } from '../utils/mediaProcessUtils';
+import { MemoryAppHeader } from '../components/MemoryAppHeader';
+import { MemoryPageHeader } from '../components/MemoryPageHeader';
+import { memoryColors, memoryLayout } from '../constants/memoryTheme';
 
 const BACKEND_URL = 'http://localhost:8000';
 
@@ -33,6 +37,8 @@ type BackupRootCategory = '유년시절' | '여행' | '미분류';
 
 export default function BackupPage({ onClose }: { onClose?: () => void }) {
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const isNarrow = width < 900;
     const { memoryList, fetchMemories, appendActiveMemory, appendActiveMemories } = useMemory();
 
     // AI 분류가 없는 레거시 앨범은 별도의 미분류 보관함에서 관리한다.
@@ -40,7 +46,9 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
 
     const [backupAlbums, setBackupAlbums] = useState<ExtendedBackupAlbumMeta[]>([]);
     const [folders, setFolders] = useState<string[]>([]);
-    const [categorizedFolders, setCategorizedFolders] = useState<{ [key: string]: string[] }>({
+    const [categorizedFolders, setCategorizedFolders] = useState<{
+        [key: string]: string[];
+    }>({
         유년시절: [],
         여행: [],
         childhood: [],
@@ -185,7 +193,9 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
         if (!ok) return;
 
         try {
-            await fetch(`${BACKEND_URL}/api/folders/${folderName}`, { method: 'DELETE' });
+            await fetch(`${BACKEND_URL}/api/folders/${folderName}`, {
+                method: 'DELETE',
+            });
             if (selectedFolderTab === folderName) setSelectedFolderTab('전체');
             await fetchBackupData();
         } catch (e) {
@@ -431,18 +441,14 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
     };
 
     const handleDeleteSingle = async (albumId: string) => {
-        const ok =
-            Platform.OS === 'web'
-                ? window.confirm('이 앨범과 실제 저장 파일을 영구 삭제하시겠습니까?')
-                : true;
+        const ok = Platform.OS === 'web' ? window.confirm('이 앨범과 실제 저장 파일을 영구 삭제하시겠습니까?') : true;
         if (!ok) return;
 
         try {
             setLoading(true);
-            const res = await fetch(
-                `${BACKEND_URL}/api/backup-albums/${encodeURIComponent(albumId)}`,
-                { method: 'DELETE' },
-            );
+            const res = await fetch(`${BACKEND_URL}/api/backup-albums/${encodeURIComponent(albumId)}`, {
+                method: 'DELETE',
+            });
             const data = await res.json().catch(() => ({}));
 
             if (!res.ok) {
@@ -523,14 +529,10 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
         if (album.rootCategory === '여행') return '여행';
         if (album.rootCategory === '유년시절') return '유년시절';
 
-        const hasTravelPath = album.imageUrls?.some(
-            (u) => u.includes('/여행/') || u.includes('/travel/'),
-        );
+        const hasTravelPath = album.imageUrls?.some((u) => u.includes('/여행/') || u.includes('/travel/'));
         if (hasTravelPath) return '여행';
 
-        const hasChildhoodPath = album.imageUrls?.some(
-            (u) => u.includes('/유년시절/') || u.includes('/childhood/'),
-        );
+        const hasChildhoodPath = album.imageUrls?.some((u) => u.includes('/유년시절/') || u.includes('/childhood/'));
         if (hasChildhoodPath) return '유년시절';
 
         return '미분류';
@@ -568,401 +570,451 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
 
     return (
         <View style={styles.pageContainer}>
-            <View style={styles.modalCard}>
+            <MemoryAppHeader />
+            <View style={[styles.modalCard, isNarrow && styles.modalCardNarrow]}>
                 {/* 상단 헤더 */}
                 <View style={styles.headerRow}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.title}>📦 추억 보관함 & 폴더 관리</Text>
-                        <Text style={styles.subtitle}>
-                            보관된 추억을 [유년 시절], [여행], [미분류]로 나누어 관리합니다.
-                        </Text>
-                    </View>
-                    <TouchableOpacity style={styles.closeBtn} onPress={handleCloseOrBack}>
-                        <Text style={styles.closeBtnText}>✕</Text>
+                    <MemoryPageHeader
+                        title="백업 보관함"
+                        subtitle="저장한 원본 추억을 폴더별로 정리하고 인터뷰 내용을 다시 확인하세요."
+                    />
+                    <TouchableOpacity style={styles.backToHomeBtn} onPress={handleCloseOrBack}>
+                        <Text style={styles.backToHomeBtnText}>추억 수집으로</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* 대분류 전환 탭 */}
-                <View style={styles.rootCategoryBar}>
-                    <TouchableOpacity
-                        style={[styles.rootTabBtn, activeRootCategory === '유년시절' && styles.rootTabBtnActive]}
-                        onPress={() => {
-                            setActiveRootCategory('유년시절');
-                            setSelectedFolderTab('전체');
-                        }}
-                    >
-                        <Text
-                            style={[
-                                styles.rootTabBtnText,
-                                activeRootCategory === '유년시절' && styles.rootTabBtnTextActive,
-                            ]}
-                        >
-                            {'🧸 유년 시절 (' + rootCategoryCounts['유년시절'] + ')'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.rootTabBtn, activeRootCategory === '여행' && styles.rootTabBtnActive]}
-                        onPress={() => {
-                            setActiveRootCategory('여행');
-                            setSelectedFolderTab('전체');
-                        }}
-                    >
-                        <Text
-                            style={[
-                                styles.rootTabBtnText,
-                                activeRootCategory === '여행' && styles.rootTabBtnTextActive,
-                            ]}
-                        >
-                            {'✈️ 여행 (' + rootCategoryCounts['여행'] + ')'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.rootTabBtn, activeRootCategory === '미분류' && styles.rootTabBtnActive]}
-                        onPress={() => {
-                            setActiveRootCategory('미분류');
-                            setSelectedFolderTab('전체');
-                        }}
-                    >
-                        <Text
-                            style={[
-                                styles.rootTabBtnText,
-                                activeRootCategory === '미분류' && styles.rootTabBtnTextActive,
-                            ]}
-                        >
-                            {'❓ 미분류 (' + rootCategoryCounts['미분류'] + ')'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* 검색창 & 새 폴더 만들기 */}
-                <View style={styles.folderActionBar}>
-                    <View style={styles.searchBox}>
-                        <Text style={{ fontSize: 14 }}>🔍</Text>
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder={`[${activeRootCategory}] 제목, 위치, 사연 검색...`}
-                            placeholderTextColor="#94A3B8"
-                            value={searchKeyword}
-                            onChangeText={setSearchKeyword}
-                        />
-                        {searchKeyword.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchKeyword('')}>
-                                <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '700' }}>✕</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {activeRootCategory !== '미분류' && (
-                        <TouchableOpacity style={styles.createFolderBtn} onPress={() => setIsFolderModalOpen(true)}>
-                            <Text style={styles.createFolderBtnText}>{`📁 새 ${activeRootCategory} 폴더 +`}</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* 미분류는 과거 앨범을 한곳에서 정리하는 영역이므로 하위 폴더 탭을 만들지 않는다. */}
-                {activeRootCategory !== '미분류' && (
-                <View style={styles.folderTabWrapper}>
-                    <MouseDragHorizontalScroll contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                        <TouchableOpacity
-                            style={[styles.folderTab, selectedFolderTab === '전체' && styles.folderTabActive]}
-                            onPress={() => setSelectedFolderTab('전체')}
-                        >
-                            <Text
+                <View style={[styles.backupWorkspace, isNarrow && styles.backupWorkspaceNarrow]}>
+                    <View style={[styles.folderSidebar, isNarrow && styles.folderSidebarNarrow]}>
+                        <Text style={styles.sidebarTitle}>내 폴더</Text>
+                        {/* 대분류 전환 탭 */}
+                        <View style={styles.rootCategoryBar}>
+                            <TouchableOpacity
                                 style={[
-                                    styles.folderTabText,
-                                    selectedFolderTab === '전체' && styles.folderTabTextActive,
+                                    styles.rootTabBtn,
+                                    activeRootCategory === '유년시절' && styles.rootTabBtnActive,
                                 ]}
+                                onPress={() => {
+                                    setActiveRootCategory('유년시절');
+                                    setSelectedFolderTab('전체');
+                                }}
                             >
-                                {`🗂️ 전체 (${filteredAlbums.length})`}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.folderTab, selectedFolderTab === '미분류' && styles.folderTabActive]}
-                            onPress={() => setSelectedFolderTab('미분류')}
-                        >
-                            <Text
-                                style={[
-                                    styles.folderTabText,
-                                    selectedFolderTab === '미분류' && styles.folderTabTextActive,
-                                ]}
-                            >
-                                {`📄 미분류 (${filteredAlbums.filter((a) => !a.categoryFolder || a.categoryFolder === '미분류').length})`}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {currentSubFolders.map((fName) => {
-                            const count = filteredAlbums.filter((a) => a.categoryFolder === fName).length;
-                            const isActive = selectedFolderTab === fName;
-                            return (
-                                <View key={fName} style={styles.customFolderTabContainer}>
-                                    <TouchableOpacity
-                                        style={[styles.folderTab, isActive && styles.folderTabActive]}
-                                        onPress={() => setSelectedFolderTab(fName)}
-                                    >
-                                        <Text style={[styles.folderTabText, isActive && styles.folderTabTextActive]}>
-                                            {`📁 ${fName} (${count})`}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.folderRenameSmallBtn}
-                                        onPress={(e) => handleOpenRenameFolder(fName, e)}
-                                    >
-                                        <Text style={{ fontSize: 10, color: '#0284C7' }}>✏️</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.folderDeleteSmallBtn}
-                                        onPress={(e) => handleDeleteFolder(fName, e)}
-                                    >
-                                        <Text style={{ fontSize: 10, color: '#DC2626' }}>✕</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            );
-                        })}
-                    </MouseDragHorizontalScroll>
-                </View>
-                )}
-
-                {/* 툴바 */}
-                <View style={styles.toolbarRow}>
-                    <TouchableOpacity
-                        style={styles.selectAllBtn}
-                        onPress={() => {
-                            if (isAllSelected) setSelectedAlbumIds(new Set());
-                            else setSelectedAlbumIds(new Set(filteredAlbums.map((a) => a.id)));
-                        }}
-                    >
-                        <Text style={styles.selectAllBtnText}>{isAllSelected ? '선택 해제 ✕' : '전체 선택 ✓'}</Text>
-                    </TouchableOpacity>
-
-                    {selectedAlbumIds.size > 0 && (
-                        <View style={styles.batchActionGroup}>
-                            <TouchableOpacity style={styles.batchMoveBtn} onPress={() => setIsBatchMovingOpen(true)}>
-                                <Text style={styles.batchMoveBtnText}>
-                                    {`📁 선택 폴더 이동 (${selectedAlbumIds.size}개)`}
+                                <Text
+                                    style={[
+                                        styles.rootTabBtnText,
+                                        activeRootCategory === '유년시절' && styles.rootTabBtnTextActive,
+                                    ]}
+                                >
+                                    {'🧸 유년 시절 (' + rootCategoryCounts['유년시절'] + ')'}
                                 </Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.batchRestoreBtn} onPress={handleBatchRestore}>
-                                <Text style={styles.batchRestoreBtnText}>
-                                    {`📥 선택 일괄 복원 (${selectedAlbumIds.size}개)`}
+                            <TouchableOpacity
+                                style={[styles.rootTabBtn, activeRootCategory === '여행' && styles.rootTabBtnActive]}
+                                onPress={() => {
+                                    setActiveRootCategory('여행');
+                                    setSelectedFolderTab('전체');
+                                }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.rootTabBtnText,
+                                        activeRootCategory === '여행' && styles.rootTabBtnTextActive,
+                                    ]}
+                                >
+                                    {'✈️ 여행 (' + rootCategoryCounts['여행'] + ')'}
                                 </Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.batchDeleteBtn} onPress={handleBatchDelete}>
-                                <Text style={styles.batchDeleteBtnText}>
-                                    {`🗑️ 선택 영구 삭제 (${selectedAlbumIds.size}개)`}
+                            <TouchableOpacity
+                                style={[styles.rootTabBtn, activeRootCategory === '미분류' && styles.rootTabBtnActive]}
+                                onPress={() => {
+                                    setActiveRootCategory('미분류');
+                                    setSelectedFolderTab('전체');
+                                }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.rootTabBtnText,
+                                        activeRootCategory === '미분류' && styles.rootTabBtnTextActive,
+                                    ]}
+                                >
+                                    {'❓ 미분류 (' + rootCategoryCounts['미분류'] + ')'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
-                    )}
-                </View>
 
-                {loading && (
-                    <View style={styles.loadingBox}>
-                        <ActivityIndicator size="large" color="#0284C7" />
-                        <Text style={styles.loadingText}>보관함 데이터를 처리하는 중...</Text>
-                    </View>
-                )}
+                        {/* 검색창 & 새 폴더 만들기 */}
+                        <View style={styles.folderActionBar}>
+                            <View style={styles.searchBox}>
+                                <Text style={{ fontSize: 14 }}>🔍</Text>
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder={`[${activeRootCategory}] 제목, 위치, 사연 검색...`}
+                                    placeholderTextColor="#94A3B8"
+                                    value={searchKeyword}
+                                    onChangeText={setSearchKeyword}
+                                />
+                                {searchKeyword.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearchKeyword('')}>
+                                        <Text
+                                            style={{
+                                                color: '#94A3B8',
+                                                fontSize: 13,
+                                                fontWeight: '700',
+                                            }}
+                                        >
+                                            ✕
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
 
-                {!loading && fetchError && (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>🔌</Text>
-                        <Text style={styles.emptyTitle}>백엔드 서버에 연결할 수 없습니다.</Text>
-                        <TouchableOpacity style={styles.retryBtn} onPress={fetchBackupData}>
-                            <Text style={styles.retryBtnText}>🔄 다시 시도</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                            {activeRootCategory !== '미분류' && (
+                                <TouchableOpacity
+                                    style={styles.createFolderBtn}
+                                    onPress={() => setIsFolderModalOpen(true)}
+                                >
+                                    <Text
+                                        style={styles.createFolderBtnText}
+                                    >{`📁 새 ${activeRootCategory} 폴더 +`}</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
 
-                {!loading && !fetchError && filteredAlbums.length === 0 && (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>📂</Text>
-                        <Text style={styles.emptyTitle}>
-                            {searchKeyword
-                                ? `'${searchKeyword}'에 대한 검색 결과가 없습니다.`
-                                : `[${activeRootCategory}] 보관함에 앨범이 없습니다.`}
-                        </Text>
-                    </View>
-                )}
-
-                {!loading && !fetchError && filteredAlbums.length > 0 && (
-                    <ScrollView style={styles.albumListScroll} contentContainerStyle={styles.albumListContent}>
-                        {filteredAlbums.map((album) => {
-                            const isSelected = selectedAlbumIds.has(album.id);
-                            const isAlreadyPresent = isAlreadyInIndex(album);
-
-                            return (
-                                <View key={album.id} style={[styles.albumCard, isSelected && styles.albumCardSelected]}>
+                        {/* 미분류는 과거 앨범을 한곳에서 정리하는 영역이므로 하위 폴더 탭을 만들지 않는다. */}
+                        {activeRootCategory !== '미분류' && (
+                            <View style={styles.folderTabWrapper}>
+                                <View style={styles.folderList}>
                                     <TouchableOpacity
-                                        style={[styles.checkbox, isSelected && styles.checkboxActive]}
-                                        onPress={() => {
-                                            setSelectedAlbumIds((prev) => {
-                                                const next = new Set(prev);
-                                                if (next.has(album.id)) next.delete(album.id);
-                                                else next.add(album.id);
-                                                return next;
-                                            });
-                                        }}
+                                        style={[
+                                            styles.folderTab,
+                                            selectedFolderTab === '전체' && styles.folderTabActive,
+                                        ]}
+                                        onPress={() => setSelectedFolderTab('전체')}
                                     >
-                                        <Text style={[styles.checkmark, isSelected && styles.checkmarkActive]}>
-                                            {isSelected ? '✓' : ''}
+                                        <Text
+                                            style={[
+                                                styles.folderTabText,
+                                                selectedFolderTab === '전체' && styles.folderTabTextActive,
+                                            ]}
+                                        >
+                                            {`🗂️ 전체 (${filteredAlbums.length})`}
                                         </Text>
                                     </TouchableOpacity>
 
-                                    <View style={styles.albumInfoWrapper}>
-                                        <MouseDragHorizontalScroll contentContainerStyle={styles.thumbScroll}>
-                                            {album.imageUrls.map((mediaUrl, i) => {
-                                                const isVid = isVideoUrl(mediaUrl);
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.folderTab,
+                                            selectedFolderTab === '미분류' && styles.folderTabActive,
+                                        ]}
+                                        onPress={() => setSelectedFolderTab('미분류')}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.folderTabText,
+                                                selectedFolderTab === '미분류' && styles.folderTabTextActive,
+                                            ]}
+                                        >
+                                            {`📄 미분류 (${filteredAlbums.filter((a) => !a.categoryFolder || a.categoryFolder === '미분류').length})`}
+                                        </Text>
+                                    </TouchableOpacity>
 
-                                                return (
-                                                    <View key={i} style={styles.thumbContainer}>
-                                                        {isVid && Platform.OS === 'web' ? (
-                                                            <div
-                                                                style={{
-                                                                    width: 78,
-                                                                    height: 60,
-                                                                    position: 'relative',
-                                                                    backgroundColor: '#000',
-                                                                    borderRadius: 6,
-                                                                    overflow: 'hidden',
-                                                                }}
-                                                            >
-                                                                <video
-                                                                    src={mediaUrl}
-                                                                    style={{
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        objectFit: 'cover',
-                                                                    }}
-                                                                    muted
-                                                                />
-                                                                <div
-                                                                    style={{
-                                                                        position: 'absolute',
-                                                                        inset: 0,
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        backgroundColor: 'rgba(0,0,0,0.3)',
-                                                                    }}
-                                                                >
-                                                                    <span style={{ fontSize: 12 }}>🎬</span>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <Image
-                                                                source={{ uri: mediaUrl }}
-                                                                style={styles.thumbImg}
-                                                                resizeMode="cover"
-                                                            />
-                                                        )}
-                                                    </View>
-                                                );
-                                            })}
-                                        </MouseDragHorizontalScroll>
-
-                                        <View style={styles.metaRow}>
-                                            <View style={{ flex: 1 }}>
-                                                <View
-                                                    style={{
-                                                        flexDirection: 'row',
-                                                        alignItems: 'center',
-                                                        gap: 6,
-                                                        flexWrap: 'wrap',
-                                                    }}
-                                                >
-                                                    <Text style={styles.albumTitle}>
-                                                        {album.curatedNote?.title ||
-                                                            album.analysis?.title ||
-                                                            '추억의 순간'}
-                                                    </Text>
-                                                    <View style={styles.folderTag}>
-                                                        <Text
-                                                            style={styles.folderTagText}
-                                                        >{`📁 ${album.categoryFolder || '미분류'}`}</Text>
-                                                    </View>
-                                                    {album.history && album.history.length > 0 && (
-                                                        <View style={styles.historyBadge}>
-                                                            <Text
-                                                                style={styles.historyBadgeText}
-                                                            >{`📜 버전 ${album.history.length}개 보관`}</Text>
-                                                        </View>
-                                                    )}
-                                                    {isAlreadyPresent && (
-                                                        <View style={styles.alreadyBadge}>
-                                                            <Text style={styles.alreadyBadgeText}>
-                                                                현재 홈에 존재함
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                                <Text style={styles.albumSub}>
-                                                    {`📍 ${album.analysis?.location || '장소 미정'} · ⏳ ${album.analysis?.yearEstimate || '시기 미정'} · 🖼️ 미디어 ${album.imageUrls.length}개`}
-                                                </Text>
-                                            </View>
-
-                                            <View style={styles.cardBtnGroup}>
+                                    {currentSubFolders.map((fName) => {
+                                        const count = filteredAlbums.filter((a) => a.categoryFolder === fName).length;
+                                        const isActive = selectedFolderTab === fName;
+                                        return (
+                                            <View key={fName} style={styles.customFolderTabContainer}>
                                                 <TouchableOpacity
-                                                    style={styles.renameFilesBtn}
-                                                    onPress={() => {
-                                                        setFileManagerAlbum(album);
-                                                        setEditingTargetUrl(null);
-                                                        setNewFileNameInput('');
-                                                    }}
-                                                >
-                                                    <Text style={styles.renameFilesBtnText}>✏️ 파일명 관리</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={styles.moveFolderBtn}
-                                                    onPress={() => setMovingAlbum(album)}
-                                                >
-                                                    <Text style={styles.moveFolderBtnText}>📁 폴더 이동</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={styles.detailBtn}
-                                                    onPress={() => setViewingAlbum(album)}
-                                                >
-                                                    <Text style={styles.detailBtnText}>👁️ 상세 보기</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.restoreSingleBtn,
-                                                        isAlreadyPresent && styles.restoreSingleBtnDisabled,
-                                                    ]}
-                                                    onPress={() => handleRestoreSingle(album)}
+                                                    style={[styles.folderTab, isActive && styles.folderTabActive]}
+                                                    onPress={() => setSelectedFolderTab(fName)}
                                                 >
                                                     <Text
                                                         style={[
-                                                            styles.restoreSingleBtnText,
-                                                            isAlreadyPresent && styles.restoreSingleBtnTextDisabled,
+                                                            styles.folderTabText,
+                                                            isActive && styles.folderTabTextActive,
                                                         ]}
                                                     >
-                                                        {isAlreadyPresent ? '✓ 홈에 있음' : '📥 홈으로 복원'}
+                                                        {`📁 ${fName} (${count})`}
                                                     </Text>
                                                 </TouchableOpacity>
 
                                                 <TouchableOpacity
-                                                    style={styles.deleteSingleBtn}
-                                                    onPress={() => handleDeleteSingle(album.id)}
+                                                    style={styles.folderRenameSmallBtn}
+                                                    onPress={(e) => handleOpenRenameFolder(fName, e)}
                                                 >
-                                                    <Text style={styles.deleteSingleBtnText}>🗑️ 삭제</Text>
+                                                    <Text style={{ fontSize: 10, color: '#0284C7' }}>✏️</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={styles.folderDeleteSmallBtn}
+                                                    onPress={(e) => handleDeleteFolder(fName, e)}
+                                                >
+                                                    <Text style={{ fontSize: 10, color: '#DC2626' }}>✕</Text>
                                                 </TouchableOpacity>
                                             </View>
-                                        </View>
-                                    </View>
+                                        );
+                                    })}
                                 </View>
-                            );
-                        })}
-                    </ScrollView>
-                )}
+                            </View>
+                        )}
+                    </View>
+                    <View style={styles.albumArea}>
+                        <View style={styles.albumAreaHeader}>
+                            <Text style={styles.albumAreaTitle}>
+                                {selectedFolderTab === '전체' ? '전체 추억' : selectedFolderTab}
+                            </Text>
+                            <Text style={styles.albumCountBadge}>{`${filteredAlbums.length}개 앨범`}</Text>
+                        </View>
+
+                        {/* 툴바 */}
+                        <View style={styles.toolbarRow}>
+                            <TouchableOpacity
+                                style={styles.selectAllBtn}
+                                onPress={() => {
+                                    if (isAllSelected) setSelectedAlbumIds(new Set());
+                                    else setSelectedAlbumIds(new Set(filteredAlbums.map((a) => a.id)));
+                                }}
+                            >
+                                <Text style={styles.selectAllBtnText}>
+                                    {isAllSelected ? '선택 해제 ✕' : '전체 선택 ✓'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {selectedAlbumIds.size > 0 && (
+                                <View style={styles.batchActionGroup}>
+                                    <TouchableOpacity
+                                        style={styles.batchMoveBtn}
+                                        onPress={() => setIsBatchMovingOpen(true)}
+                                    >
+                                        <Text style={styles.batchMoveBtnText}>
+                                            {`📁 선택 폴더 이동 (${selectedAlbumIds.size}개)`}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.batchRestoreBtn} onPress={handleBatchRestore}>
+                                        <Text style={styles.batchRestoreBtnText}>
+                                            {`📥 선택 일괄 복원 (${selectedAlbumIds.size}개)`}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.batchDeleteBtn} onPress={handleBatchDelete}>
+                                        <Text style={styles.batchDeleteBtnText}>
+                                            {`🗑️ 선택 영구 삭제 (${selectedAlbumIds.size}개)`}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+
+                        {loading && (
+                            <View style={styles.loadingBox}>
+                                <ActivityIndicator size="large" color="#0284C7" />
+                                <Text style={styles.loadingText}>보관함 데이터를 처리하는 중...</Text>
+                            </View>
+                        )}
+
+                        {!loading && fetchError && (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyIcon}>🔌</Text>
+                                <Text style={styles.emptyTitle}>백엔드 서버에 연결할 수 없습니다.</Text>
+                                <TouchableOpacity style={styles.retryBtn} onPress={fetchBackupData}>
+                                    <Text style={styles.retryBtnText}>🔄 다시 시도</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {!loading && !fetchError && filteredAlbums.length === 0 && (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyIcon}>📂</Text>
+                                <Text style={styles.emptyTitle}>
+                                    {searchKeyword
+                                        ? `'${searchKeyword}'에 대한 검색 결과가 없습니다.`
+                                        : `[${activeRootCategory}] 보관함에 앨범이 없습니다.`}
+                                </Text>
+                            </View>
+                        )}
+
+                        {!loading && !fetchError && filteredAlbums.length > 0 && (
+                            <ScrollView style={styles.albumListScroll} contentContainerStyle={styles.albumListContent}>
+                                {filteredAlbums.map((album) => {
+                                    const isSelected = selectedAlbumIds.has(album.id);
+                                    const isAlreadyPresent = isAlreadyInIndex(album);
+
+                                    return (
+                                        <View
+                                            key={album.id}
+                                            style={[styles.albumCard, isSelected && styles.albumCardSelected]}
+                                        >
+                                            <TouchableOpacity
+                                                style={[styles.checkbox, isSelected && styles.checkboxActive]}
+                                                onPress={() => {
+                                                    setSelectedAlbumIds((prev) => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(album.id)) next.delete(album.id);
+                                                        else next.add(album.id);
+                                                        return next;
+                                                    });
+                                                }}
+                                            >
+                                                <Text style={[styles.checkmark, isSelected && styles.checkmarkActive]}>
+                                                    {isSelected ? '✓' : ''}
+                                                </Text>
+                                            </TouchableOpacity>
+
+                                            <View style={styles.albumInfoWrapper}>
+                                                <MouseDragHorizontalScroll contentContainerStyle={styles.thumbScroll}>
+                                                    {album.imageUrls.map((mediaUrl, i) => {
+                                                        const isVid = isVideoUrl(mediaUrl);
+
+                                                        return (
+                                                            <View key={i} style={styles.thumbContainer}>
+                                                                {isVid && Platform.OS === 'web' ? (
+                                                                    <div
+                                                                        style={{
+                                                                            width: 78,
+                                                                            height: 60,
+                                                                            position: 'relative',
+                                                                            backgroundColor: '#000',
+                                                                            borderRadius: 6,
+                                                                            overflow: 'hidden',
+                                                                        }}
+                                                                    >
+                                                                        <video
+                                                                            src={mediaUrl}
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                height: '100%',
+                                                                                objectFit: 'cover',
+                                                                            }}
+                                                                            muted
+                                                                        />
+                                                                        <div
+                                                                            style={{
+                                                                                position: 'absolute',
+                                                                                inset: 0,
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                backgroundColor: 'rgba(0,0,0,0.3)',
+                                                                            }}
+                                                                        >
+                                                                            <span style={{ fontSize: 12 }}>🎬</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Image
+                                                                        source={{ uri: mediaUrl }}
+                                                                        style={styles.thumbImg}
+                                                                        resizeMode="cover"
+                                                                    />
+                                                                )}
+                                                            </View>
+                                                        );
+                                                    })}
+                                                </MouseDragHorizontalScroll>
+
+                                                <View style={styles.metaRow}>
+                                                    <View style={{ flex: 1 }}>
+                                                        <View
+                                                            style={{
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                gap: 6,
+                                                                flexWrap: 'wrap',
+                                                            }}
+                                                        >
+                                                            <Text style={styles.albumTitle}>
+                                                                {album.curatedNote?.title ||
+                                                                    album.analysis?.title ||
+                                                                    '추억의 순간'}
+                                                            </Text>
+                                                            <View style={styles.folderTag}>
+                                                                <Text
+                                                                    style={styles.folderTagText}
+                                                                >{`📁 ${album.categoryFolder || '미분류'}`}</Text>
+                                                            </View>
+                                                            {album.history && album.history.length > 0 && (
+                                                                <View style={styles.historyBadge}>
+                                                                    <Text
+                                                                        style={styles.historyBadgeText}
+                                                                    >{`📜 버전 ${album.history.length}개 보관`}</Text>
+                                                                </View>
+                                                            )}
+                                                            {isAlreadyPresent && (
+                                                                <View style={styles.alreadyBadge}>
+                                                                    <Text style={styles.alreadyBadgeText}>
+                                                                        현재 홈에 존재함
+                                                                    </Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        <Text style={styles.albumSub}>
+                                                            {`📍 ${album.analysis?.location || '장소 미정'} · ⏳ ${album.analysis?.yearEstimate || '시기 미정'} · 🖼️ 미디어 ${album.imageUrls.length}개`}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View style={styles.cardBtnGroup}>
+                                                        <TouchableOpacity
+                                                            style={styles.renameFilesBtn}
+                                                            onPress={() => {
+                                                                setFileManagerAlbum(album);
+                                                                setEditingTargetUrl(null);
+                                                                setNewFileNameInput('');
+                                                            }}
+                                                        >
+                                                            <Text style={styles.renameFilesBtnText}>
+                                                                ✏️ 파일명 관리
+                                                            </Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={styles.moveFolderBtn}
+                                                            onPress={() => setMovingAlbum(album)}
+                                                        >
+                                                            <Text style={styles.moveFolderBtnText}>📁 폴더 이동</Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={styles.detailBtn}
+                                                            onPress={() => setViewingAlbum(album)}
+                                                        >
+                                                            <Text style={styles.detailBtnText}>👁️ 상세 보기</Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={[
+                                                                styles.restoreSingleBtn,
+                                                                isAlreadyPresent && styles.restoreSingleBtnDisabled,
+                                                            ]}
+                                                            onPress={() => handleRestoreSingle(album)}
+                                                        >
+                                                            <Text
+                                                                style={[
+                                                                    styles.restoreSingleBtnText,
+                                                                    isAlreadyPresent &&
+                                                                        styles.restoreSingleBtnTextDisabled,
+                                                                ]}
+                                                            >
+                                                                {isAlreadyPresent ? '✓ 홈에 있음' : '📥 홈으로 복원'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity
+                                                            style={styles.deleteSingleBtn}
+                                                            onPress={() => handleDeleteSingle(album.id)}
+                                                        >
+                                                            <Text style={styles.deleteSingleBtnText}>🗑️ 삭제</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
 
                 {/* 모달들 */}
                 <CreateFolderModal
@@ -1161,32 +1213,84 @@ export default function BackupPage({ onClose }: { onClose?: () => void }) {
 const styles = StyleSheet.create({
     pageContainer: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
+        backgroundColor: memoryColors.canvas,
     },
     modalCard: {
+        flex: 1,
         width: '100%',
-        maxWidth: 980,
-        height: '92%',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        maxWidth: 1440,
+        alignSelf: 'center',
+        backgroundColor: memoryColors.canvas,
+        paddingHorizontal: memoryLayout.desktopPadding,
+        paddingTop: 28,
+        paddingBottom: 32,
+    },
+    modalCardNarrow: {
+        paddingHorizontal: memoryLayout.mobilePadding,
+        paddingTop: 22,
     },
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-        paddingBottom: 14,
-        marginBottom: 12,
+        alignItems: 'flex-start',
+        gap: 20,
     },
-    title: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-    subtitle: { fontSize: 13, color: '#64748B', marginTop: 4 },
+    backToHomeBtn: {
+        minWidth: 230,
+        minHeight: 40,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: memoryColors.brand,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    backToHomeBtnText: {
+        color: memoryColors.surface,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    backupWorkspace: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 24 },
+    backupWorkspaceNarrow: { flexDirection: 'column' },
+    folderSidebar: {
+        width: 272,
+        flexShrink: 0,
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 16,
+        padding: 24,
+    },
+    folderSidebarNarrow: { width: '100%' },
+    sidebarTitle: {
+        color: memoryColors.text,
+        fontSize: 16,
+        lineHeight: 24,
+        fontWeight: '700',
+        marginBottom: 16,
+    },
+    albumArea: { flex: 1, minWidth: 0, minHeight: 0 },
+    albumAreaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 14,
+    },
+    albumAreaTitle: {
+        color: memoryColors.text,
+        fontSize: 20,
+        lineHeight: 30,
+        fontWeight: '700',
+    },
+    albumCountBadge: {
+        color: memoryColors.textMuted,
+        backgroundColor: memoryColors.subtle,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 999,
+        fontSize: 12,
+        overflow: 'hidden',
+    },
     closeBtn: {
         padding: 8,
         backgroundColor: '#F1F5F9',
@@ -1196,82 +1300,99 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    closeBtnText: { fontSize: 16, color: '#475569', fontWeight: '800', lineHeight: 18 },
+    closeBtnText: {
+        fontSize: 16,
+        color: '#475569',
+        fontWeight: '800',
+        lineHeight: 18,
+    },
     rootCategoryBar: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 12,
+        gap: 8,
+        marginBottom: 16,
     },
     rootTabBtn: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 10,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingVertical: 9,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: memoryColors.subtle,
+        alignSelf: 'flex-start',
     },
     rootTabBtnActive: {
-        backgroundColor: '#F0F9FF',
-        borderColor: '#0284C7',
+        backgroundColor: memoryColors.brandLight,
     },
     rootTabBtnText: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#64748B',
+        color: memoryColors.textSecondary,
     },
     rootTabBtnTextActive: {
-        color: '#0284C7',
-        fontWeight: '800',
+        color: memoryColors.brand,
+        fontWeight: '700',
     },
     folderActionBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        flexDirection: 'column',
         gap: 12,
-        marginBottom: 10,
-        alignItems: 'center',
+        marginBottom: 14,
     },
     searchBox: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        width: '100%',
+        backgroundColor: memoryColors.surface,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: memoryColors.border,
         borderRadius: 8,
         paddingHorizontal: 12,
         height: 40,
         gap: 8,
     },
-    searchInput: { flex: 1, fontSize: 13, color: '#0F172A', outlineStyle: 'none' as any },
+    searchInput: {
+        flex: 1,
+        fontSize: 13,
+        color: '#0F172A',
+        outlineStyle: 'none' as any,
+    },
     createFolderBtn: {
-        backgroundColor: '#0284C7',
+        width: '100%',
+        backgroundColor: memoryColors.surface,
+        borderWidth: 1,
+        borderColor: memoryColors.border,
         paddingHorizontal: 14,
         height: 40,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    createFolderBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+    createFolderBtnText: {
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '700',
+    },
     folderTabWrapper: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-        paddingBottom: 8,
-        marginBottom: 12,
+        paddingTop: 2,
     },
+    folderList: { gap: 8 },
     folderTab: {
-        paddingVertical: 6,
+        width: '100%',
+        paddingVertical: 8,
         paddingHorizontal: 12,
-        borderRadius: 12,
-        backgroundColor: '#F1F5F9',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderRadius: 999,
+        backgroundColor: memoryColors.subtle,
     },
-    folderTabActive: { backgroundColor: '#0284C7', borderColor: '#0284C7' },
-    folderTabText: { fontSize: 12, color: '#475569', fontWeight: '600' },
-    folderTabTextActive: { color: '#FFFFFF', fontWeight: '700' },
-    customFolderTabContainer: { flexDirection: 'row', alignItems: 'center', position: 'relative' },
+    folderTabActive: { backgroundColor: memoryColors.brandLight },
+    folderTabText: {
+        fontSize: 12,
+        color: memoryColors.textSecondary,
+        fontWeight: '600',
+    },
+    folderTabTextActive: { color: memoryColors.brand, fontWeight: '700' },
+    customFolderTabContainer: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        position: 'relative',
+    },
     folderRenameSmallBtn: {
         marginLeft: -8,
         marginRight: 2,
@@ -1352,18 +1473,30 @@ const styles = StyleSheet.create({
     },
     retryBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
     albumListScroll: { flex: 1 },
-    albumListContent: { gap: 14, paddingBottom: 20 },
-    albumCard: {
+    albumListContent: {
         flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderRadius: 14,
-        padding: 16,
-        backgroundColor: '#FFFFFF',
+        flexWrap: 'wrap',
         gap: 16,
+        paddingBottom: 20,
     },
-    albumCardSelected: { borderColor: '#0284C7', backgroundColor: '#F0F9FF' },
+    albumCard: {
+        flexGrow: 1,
+        flexBasis: 300,
+        maxWidth: 520,
+        minWidth: 280,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        borderWidth: 1,
+        borderColor: memoryColors.border,
+        borderRadius: 16,
+        padding: 16,
+        backgroundColor: memoryColors.surface,
+        gap: 12,
+    },
+    albumCardSelected: {
+        borderColor: memoryColors.brand,
+        backgroundColor: memoryColors.brandLight,
+    },
     checkbox: {
         width: 22,
         height: 22,
@@ -1379,7 +1512,13 @@ const styles = StyleSheet.create({
     checkmarkActive: { color: '#FFFFFF' },
     albumInfoWrapper: { flex: 1, gap: 10 },
     thumbScroll: { flexDirection: 'row', gap: 10 },
-    thumbContainer: { width: 78, height: 60, borderRadius: 6, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+    thumbContainer: {
+        width: 78,
+        height: 60,
+        borderRadius: 6,
+        backgroundColor: '#E2E8F0',
+        overflow: 'hidden',
+    },
     thumbImg: { width: 78, height: 60, borderRadius: 6 },
     metaRow: {
         flexDirection: 'row',
@@ -1472,7 +1611,12 @@ const styles = StyleSheet.create({
         borderColor: '#E2E8F0',
     },
     modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
-    modalSubtitle: { fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 14 },
+    modalSubtitle: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 4,
+        marginBottom: 14,
+    },
     modalInput: {
         borderWidth: 1,
         borderColor: '#CBD5E1',
@@ -1530,7 +1674,12 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         padding: 8,
     },
-    fileRowThumb: { width: 50, height: 42, borderRadius: 6, backgroundColor: '#E2E8F0' },
+    fileRowThumb: {
+        width: 50,
+        height: 42,
+        borderRadius: 6,
+        backgroundColor: '#E2E8F0',
+    },
     fileRowName: { fontSize: 13, color: '#1E293B', fontWeight: '600' },
     fileInlineInput: {
         backgroundColor: '#FFFFFF',
