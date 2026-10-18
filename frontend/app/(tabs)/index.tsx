@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useMemory, MemoryItem } from '../../context/MemoryContext';
 import {
     generateMemoryInterview,
+    generateInterviewFromExistingAlbum,
     detectMemoryMode,
     InterviewAnswerItem,
     InterviewResponseData,
@@ -222,25 +223,40 @@ export default function IndexScreen() {
         }
 
         setIsProcessing(true);
+        setStatusMessage(
+            activeEditingMemory
+                ? '기존 앨범 사진과 수정한 기억 단서를 함께 분석 중입니다...'
+                : '사진과 입력한 기억의 단서를 함께 분석 중입니다...',
+        );
         try {
-            const imagePayload = await Promise.all(selectedImages.map(assetToAnalysisPayload));
+            let interviewResult: InterviewResponseData;
+            let detectedMode: 'travel' | 'childhood';
 
-            setStatusMessage('사진과 입력한 기억의 단서를 함께 분석 중입니다...');
-            const modeDetection = await detectMemoryMode(imagePayload);
-            const detectedMode = modeDetection.mode;
+            if (activeEditingMemory) {
+                interviewResult = await generateInterviewFromExistingAlbum(
+                    activeEditingMemory.id,
+                    activeEditingMemory.imageUrls,
+                    memoryContext,
+                );
+                detectedMode = interviewResult.detectedMode || activeEditingMemory.mode || 'childhood';
+            } else {
+                const imagePayload = await Promise.all(selectedImages.map(assetToAnalysisPayload));
+                const modeDetection = await detectMemoryMode(imagePayload);
+                detectedMode = modeDetection.mode;
 
-            setStatusMessage(
-                detectedMode === 'childhood'
-                    ? '유년 시절 사진의 구체적인 기억 질문을 구성 중입니다...'
-                    : '여행 사진의 장소와 순간을 되짚는 질문을 구성 중입니다...',
-            );
+                setStatusMessage(
+                    detectedMode === 'childhood'
+                        ? '유년 시절 사진의 구체적인 기억 질문을 구성 중입니다...'
+                        : '여행 사진의 장소와 순간을 되짚는 질문을 구성 중입니다...',
+                );
 
-            const interviewResult = await generateMemoryInterview(
-                imagePayload,
-                modeDetection.photoAnalyses,
-                detectedMode,
-                memoryContext,
-            );
+                interviewResult = await generateMemoryInterview(
+                    imagePayload,
+                    modeDetection.photoAnalyses,
+                    detectedMode,
+                    memoryContext,
+                );
+            }
 
             setInitialAnswers({});
             setInitialExtraStory('');
