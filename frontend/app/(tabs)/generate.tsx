@@ -25,22 +25,30 @@ export default function GenerateScreen() {
     const [activeNote, setActiveNote] = useState<MemoryItem | null>(null);
     const [activePhotoIdx, setActivePhotoIdx] = useState(0);
     const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
-    const [showBuilder, setShowBuilder] = useState(generatedNotes.length === 0);
+    const [sessionNoteIds, setSessionNoteIds] = useState<Set<string>>(new Set());
+    const [showBuilder, setShowBuilder] = useState(true);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState('');
     const [editStory, setEditStory] = useState('');
 
+    const sessionGeneratedNotes = generatedNotes.filter((note) => sessionNoteIds.has(note.id));
+
     useEffect(() => {
         if (selectedGenerateMemory) {
+            setSessionNoteIds((prev) => new Set(prev).add(selectedGenerateMemory.id));
             setActiveNote(selectedGenerateMemory);
             setActivePhotoIdx(0);
+            setShowBuilder(false);
             clearSelectedGenerateMemory();
-        } else if (!activeNote && generatedNotes.length > 0) {
-            setActiveNote(generatedNotes[0]);
-            setActivePhotoIdx(0);
         }
-    }, [selectedGenerateMemory, generatedNotes, activeNote, clearSelectedGenerateMemory]);
+    }, [selectedGenerateMemory, clearSelectedGenerateMemory]);
+
+    useEffect(() => {
+        if (!activeNote) return;
+        const refreshedNote = generatedNotes.find((note) => note.id === activeNote.id);
+        if (refreshedNote) setActiveNote(refreshedNote);
+    }, [generatedNotes]);
 
     useEffect(() => {
         if (!activeNote) return;
@@ -83,6 +91,7 @@ export default function GenerateScreen() {
     const handleGenerated = async (note: MemoryItem) => {
         const saved = await addToGeneratedNotes(note);
         if (!saved) return;
+        setSessionNoteIds((prev) => new Set(prev).add(note.id));
         setActiveNote(note);
         setActivePhotoIdx(0);
         setShowBuilder(false);
@@ -99,8 +108,9 @@ export default function GenerateScreen() {
     };
 
     const handleToggleSelectAll = () => {
-        const isAll = generatedNotes.length > 0 && generatedNotes.every((item) => selectedNoteIds.has(item.id));
-        setSelectedNoteIds(isAll ? new Set() : new Set(generatedNotes.map((item) => item.id)));
+        const isAll =
+            sessionGeneratedNotes.length > 0 && sessionGeneratedNotes.every((item) => selectedNoteIds.has(item.id));
+        setSelectedNoteIds(isAll ? new Set() : new Set(sessionGeneratedNotes.map((item) => item.id)));
     };
 
     const handleBatchDelete = async () => {
@@ -112,8 +122,10 @@ export default function GenerateScreen() {
 
         const deleted = await deleteMultipleFromGeneratedNotes(Array.from(selectedNoteIds));
         if (!deleted) return;
+        const deletedIds = new Set(selectedNoteIds);
+        const remaining = sessionGeneratedNotes.filter((note) => !deletedIds.has(note.id));
+        setSessionNoteIds(new Set(remaining.map((note) => note.id)));
         if (activeNote && selectedNoteIds.has(activeNote.id)) {
-            const remaining = generatedNotes.filter((note) => !selectedNoteIds.has(note.id));
             setActiveNote(remaining[0] || null);
         }
         setSelectedNoteIds(new Set());
@@ -124,8 +136,10 @@ export default function GenerateScreen() {
         const deleted = await deleteFromGeneratedNotes(id);
         if (!deleted) return;
 
+        const remaining = sessionGeneratedNotes.filter((note) => note.id !== id);
+        setSessionNoteIds(new Set(remaining.map((note) => note.id)));
+
         if (activeNote?.id === id) {
-            const remaining = generatedNotes.filter((note) => note.id !== id);
             setActiveNote(remaining[0] || null);
         }
 
@@ -194,7 +208,8 @@ export default function GenerateScreen() {
         if (Platform.OS === 'web') window.print();
     };
 
-    const isAllSelected = generatedNotes.length > 0 && generatedNotes.every((item) => selectedNoteIds.has(item.id));
+    const isAllSelected =
+        sessionGeneratedNotes.length > 0 && sessionGeneratedNotes.every((item) => selectedNoteIds.has(item.id));
 
     return (
         <View style={styles.container}>
@@ -225,7 +240,7 @@ export default function GenerateScreen() {
                                 </Text>
                             </TouchableOpacity>
 
-                            {generatedNotes.length > 0 ? (
+                            {sessionGeneratedNotes.length > 0 ? (
                                 <>
                                     <TouchableOpacity style={styles.selectAllBtn} onPress={handleToggleSelectAll}>
                                         <Text style={styles.selectAllBtnText}>
@@ -268,7 +283,7 @@ export default function GenerateScreen() {
                     ) : null}
 
                     <GenerateTabStrip
-                        generatedNotes={generatedNotes}
+                        generatedNotes={sessionGeneratedNotes}
                         activeNoteId={activeNote?.id}
                         selectedNoteIds={selectedNoteIds}
                         onSelectNote={(note) => {
@@ -296,9 +311,9 @@ export default function GenerateScreen() {
                         ) : (
                             <View style={styles.emptyStateBox}>
                                 <Text style={styles.emptyStateIcon}>📖</Text>
-                                <Text style={styles.emptyStateTitle}>아직 생성된 노트가 없습니다</Text>
+                                <Text style={styles.emptyStateTitle}>현재 열려 있는 노트가 없습니다</Text>
                                 <Text style={styles.emptyStateSub}>
-                                    ‘새 노트 만들기’에서 기존 추억을 선택하면 AI가 한 편의 이야기로 엮어줍니다.
+                                    ‘새 노트 만들기’에서 추억을 선택하거나 추억 보관함에서 완성된 노트를 열어보세요.
                                 </Text>
                             </View>
                         )}
