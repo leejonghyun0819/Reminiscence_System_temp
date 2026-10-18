@@ -17,7 +17,6 @@ import { useRouter } from 'expo-router';
 import { useMemory, MemoryItem } from '../../context/MemoryContext';
 import {
     generateMemoryInterview,
-    generateInterviewFromExistingAlbum,
     detectMemoryMode,
     InterviewAnswerItem,
     InterviewResponseData,
@@ -73,6 +72,7 @@ export default function IndexScreen() {
 
     const imageInputRef = useRef<HTMLInputElement | null>(null);
     const audioInputRef = useRef<HTMLInputElement | null>(null);
+    const pageScrollRef = useRef<ScrollView | null>(null);
 
     // 파일 객체 배열을 Base64 에셋으로 변환
     const convertFilesToAssets = async (files: File[]) => {
@@ -183,6 +183,37 @@ export default function IndexScreen() {
         e.target.value = '';
     };
 
+    const assetToAnalysisPayload = async (image: any) => {
+        if (typeof image?.base64 === 'string' && image.base64.length > 0) {
+            return {
+                base64: image.base64.includes(',') ? image.base64.split(',')[1] : image.base64,
+                mimeType: image.mimeType || 'image/jpeg',
+            };
+        }
+
+        if (!image?.uri) {
+            throw new Error('분석할 사진 데이터를 읽을 수 없습니다.');
+        }
+
+        const response = await fetch(image.uri);
+        if (!response.ok) {
+            throw new Error(`기존 사진을 불러오지 못했습니다. (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('기존 사진을 분석 데이터로 변환하지 못했습니다.'));
+            reader.readAsDataURL(blob);
+        });
+
+        return {
+            base64: dataUrl.split(',')[1],
+            mimeType: blob.type || image.mimeType || 'image/jpeg',
+        };
+    };
+
     // AI 모드 분석 및 신규 등록 처리
     const handleStartProcess = async () => {
         if (selectedImages.length === 0) {
@@ -192,10 +223,7 @@ export default function IndexScreen() {
 
         setIsProcessing(true);
         try {
-            const imagePayload = selectedImages.map((image) => ({
-                base64: image.base64,
-                mimeType: image.mimeType || 'image/jpeg',
-            }));
+            const imagePayload = await Promise.all(selectedImages.map(assetToAnalysisPayload));
 
             setStatusMessage('사진과 입력한 기억의 단서를 함께 분석 중입니다...');
             const modeDetection = await detectMemoryMode(imagePayload);
@@ -214,7 +242,6 @@ export default function IndexScreen() {
                 memoryContext,
             );
 
-            setActiveEditingMemory(null);
             setInitialAnswers({});
             setInitialExtraStory('');
             setInterviewData({
@@ -232,40 +259,38 @@ export default function IndexScreen() {
     };
 
     // 기존 앨범 인터뷰 수정/재분석
-    const handleOpenInterviewForExistingAlbum = async (item: MemoryItem) => {
-        setIsProcessing(true);
-        setStatusMessage('과거 사진의 단서를 전수 조사하여 기억 질문을 구성하는 중...');
+    const handleOpenInterviewForExistingAlbum = (item: MemoryItem) => {
         setActiveEditingMemory(item);
+        setSelectedImages(
+            item.imageUrls.map((uri, index) => ({
+                uri,
+                name: item.fileNames?.[index] || `existing_${index + 1}.jpg`,
+                mimeType: 'image/jpeg',
+                isExisting: true,
+            })),
+        );
+        setSelectedAudio(null);
+        setSelectedFolder(item.categoryFolder || '미분류');
+        setMemoryContext({
+            ...DEFAULT_MEMORY_CONTEXT,
+            ...(item.interviewData?.memoryContext || {}),
+        });
+        setInterviewData(null);
+        setInitialAnswers({});
+        setInitialExtraStory('');
+        setInterviewModalVisible(false);
+        setTimeout(() => pageScrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
+    };
 
-        try {
-            const interviewRes = await generateInterviewFromExistingAlbum(
-                item.id,
-                item.imageUrls,
-                item.interviewData?.memoryContext,
-            );
-
-            const prevAnswers: Record<string, string> = {};
-            let prevExtra = '';
-            if (item.interviewData && Array.isArray(item.interviewData.questions)) {
-                item.interviewData.questions.forEach((q: any) => {
-                    if (q.id === 'extra_memory') {
-                        prevExtra = q.answer || '';
-                    } else if (q.id) {
-                        prevAnswers[q.id] = q.answer || '';
-                    }
-                });
-            }
-
-            setInterviewData(interviewRes);
-            setInitialAnswers(prevAnswers);
-            setInitialExtraStory(prevExtra);
-            setInterviewModalVisible(true);
-        } catch (err: any) {
-            Alert.alert('인터뷰 분석 오류', err.message || '사진을 분석하지 못했습니다.');
-        } finally {
-            setIsProcessing(false);
-            setStatusMessage('');
-        }
+    const handleCancelReanalysis = () => {
+        setActiveEditingMemory(null);
+        setSelectedImages([]);
+        setSelectedAudio(null);
+        setSelectedFolder('미분류');
+        setMemoryContext({ ...DEFAULT_MEMORY_CONTEXT });
+        setInterviewData(null);
+        setInitialAnswers({});
+        setInitialExtraStory('');
     };
 
     // 인터뷰 결과 큐레이션 완료 저장
@@ -299,6 +324,11 @@ export default function IndexScreen() {
                     // @ts-ignore
                     interviewData: updatedInterviewData,
                 });
+
+                setSelectedImages([]);
+                setSelectedAudio(null);
+                setSelectedFolder('미분류');
+                setMemoryContext({ ...DEFAULT_MEMORY_CONTEXT });
 
                 Alert.alert(
                     '재분석 완료',
@@ -401,7 +431,7 @@ export default function IndexScreen() {
 
             <MemoryAppHeader />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView ref={pageScrollRef} contentContainerStyle={styles.scrollContent}>
                 <View style={[styles.pageShell, isNarrow && styles.pageShellNarrow]}>
                     <MemoryPageHeader
                         title="사진 속 순간에, 나의 기억을 더하세요"
@@ -412,11 +442,24 @@ export default function IndexScreen() {
                         <View style={[styles.uploadColumn, isNarrow && styles.fullWidthColumn]}>
                             <DroppableAlbumCard
                                 item={{ id: 'new_upload_card', fileNames: [], imageUrls: [] }}
-                                onDropFiles={handleDropFilesOnNewUploadCard}
+                                onDropFiles={activeEditingMemory ? undefined : handleDropFilesOnNewUploadCard}
                             >
                                 <View style={styles.cardHeaderRow}>
-                                    <Text style={styles.cardTitle}>새 추억 사진 등록</Text>
+                                    <Text style={styles.cardTitle}>
+                                        {activeEditingMemory
+                                            ? `‘${activeEditingMemory.curatedNote?.title || activeEditingMemory.analysis?.title || '기존 추억'}’ 재분석`
+                                            : '새 추억 사진 등록'}
+                                    </Text>
                                 </View>
+
+                                {activeEditingMemory ? (
+                                    <View style={styles.reanalysisNotice}>
+                                        <Text style={styles.reanalysisNoticeTitle}>기존 앨범 사진을 불러왔습니다</Text>
+                                        <Text style={styles.reanalysisNoticeText}>
+                                            오른쪽에서 기억 단서를 고친 뒤 다시 분석하세요. 완료하면 새 앨범을 만들지 않고 기존 앨범을 대체합니다.
+                                        </Text>
+                                    </View>
+                                ) : null}
 
                                 <View style={styles.largeDropZone}>
                                     {selectedImages.length === 0 ? (
@@ -434,69 +477,84 @@ export default function IndexScreen() {
                                             {selectedImages.map((img, idx) => (
                                                 <View key={idx} style={styles.previewGridItem}>
                                                     <Image source={{ uri: img.uri }} style={styles.previewGridImage} />
-                                                    <TouchableOpacity
-                                                        style={styles.removeBadge}
-                                                        onPress={() =>
-                                                            setSelectedImages((prev) =>
-                                                                prev.filter((_, i) => i !== idx),
-                                                            )
-                                                        }
-                                                    >
-                                                        <Text style={styles.removeBadgeText}>✕</Text>
-                                                    </TouchableOpacity>
+                                                    {!activeEditingMemory ? (
+                                                        <TouchableOpacity
+                                                            style={styles.removeBadge}
+                                                            onPress={() =>
+                                                                setSelectedImages((prev) =>
+                                                                    prev.filter((_, i) => i !== idx),
+                                                                )
+                                                            }
+                                                        >
+                                                            <Text style={styles.removeBadgeText}>✕</Text>
+                                                        </TouchableOpacity>
+                                                    ) : null}
                                                 </View>
                                             ))}
-                                            <TouchableOpacity style={styles.addMoreGridBtn} onPress={handlePickImages}>
-                                                <Text style={styles.addMoreGridIcon}>＋</Text>
-                                                <Text style={styles.addMoreGridText}>사진 추가</Text>
-                                            </TouchableOpacity>
+                                            {!activeEditingMemory ? (
+                                                <TouchableOpacity style={styles.addMoreGridBtn} onPress={handlePickImages}>
+                                                    <Text style={styles.addMoreGridIcon}>＋</Text>
+                                                    <Text style={styles.addMoreGridText}>사진 추가</Text>
+                                                </TouchableOpacity>
+                                            ) : null}
                                         </View>
                                     )}
                                 </View>
 
-                                <Text style={styles.fileTypeHint}>JPG · PNG · WEBP / 여러 장 선택 가능</Text>
-                                <TouchableOpacity style={styles.fileSelectBtn} onPress={handlePickImages}>
-                                    <Text style={styles.fileSelectBtnText}>사진 선택</Text>
-                                </TouchableOpacity>
-
-                                <View style={styles.optionRow}>
-                                    {selectedAudio ? (
-                                        <View style={styles.audioChip}>
-                                            <Text style={styles.audioChipText}>🎤 {selectedAudio.name}</Text>
-                                            <TouchableOpacity onPress={() => setSelectedAudio(null)}>
-                                                <Text style={styles.audioRemoveText}>✕</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity style={styles.audioAddBtn} onPress={handlePickAudio}>
-                                            <Text style={styles.audioAddBtnText}>음성 파일 첨부 · 선택</Text>
+                                {activeEditingMemory ? (
+                                    <Text style={styles.fileTypeHint}>
+                                        기존 사진 {selectedImages.length}장 · 사진 변경은 사진 관리에서 할 수 있습니다.
+                                    </Text>
+                                ) : (
+                                    <>
+                                        <Text style={styles.fileTypeHint}>JPG · PNG · WEBP / 여러 장 선택 가능</Text>
+                                        <TouchableOpacity style={styles.fileSelectBtn} onPress={handlePickImages}>
+                                            <Text style={styles.fileSelectBtnText}>사진 선택</Text>
                                         </TouchableOpacity>
-                                    )}
-                                </View>
 
-                                <Text style={styles.folderLabel}>보관 폴더</Text>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.folderRow}
-                                >
-                                    {folderList.map((f) => (
-                                        <TouchableOpacity
-                                            key={f}
-                                            style={[styles.folderChip, selectedFolder === f && styles.folderChipActive]}
-                                            onPress={() => setSelectedFolder(f)}
+                                        <View style={styles.optionRow}>
+                                            {selectedAudio ? (
+                                                <View style={styles.audioChip}>
+                                                    <Text style={styles.audioChipText}>🎤 {selectedAudio.name}</Text>
+                                                    <TouchableOpacity onPress={() => setSelectedAudio(null)}>
+                                                        <Text style={styles.audioRemoveText}>✕</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ) : (
+                                                <TouchableOpacity style={styles.audioAddBtn} onPress={handlePickAudio}>
+                                                    <Text style={styles.audioAddBtnText}>음성 파일 첨부 · 선택</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+
+                                        <Text style={styles.folderLabel}>보관 폴더</Text>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            contentContainerStyle={styles.folderRow}
                                         >
-                                            <Text
-                                                style={[
-                                                    styles.folderChipText,
-                                                    selectedFolder === f && styles.folderChipTextActive,
-                                                ]}
-                                            >
-                                                {f}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                                            {folderList.map((f) => (
+                                                <TouchableOpacity
+                                                    key={f}
+                                                    style={[
+                                                        styles.folderChip,
+                                                        selectedFolder === f && styles.folderChipActive,
+                                                    ]}
+                                                    onPress={() => setSelectedFolder(f)}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.folderChipText,
+                                                            selectedFolder === f && styles.folderChipTextActive,
+                                                        ]}
+                                                    >
+                                                        {f}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </>
+                                )}
                             </DroppableAlbumCard>
                         </View>
 
@@ -507,27 +565,36 @@ export default function IndexScreen() {
                                 disabled={isProcessing}
                             />
 
-                            <TouchableOpacity
-                                style={[
-                                    styles.actionSubmitBtn,
-                                    (isProcessing || selectedImages.length === 0) && styles.actionSubmitBtnDisabled,
-                                ]}
-                                onPress={handleStartProcess}
-                                disabled={isProcessing || selectedImages.length === 0}
-                            >
-                                {isProcessing ? (
-                                    <View style={styles.loadingRow}>
-                                        <ActivityIndicator color="#fff" size="small" />
-                                        <Text style={styles.actionSubmitBtnText}>{statusMessage || '분석 중...'}</Text>
-                                    </View>
-                                ) : (
-                                    <Text style={styles.actionSubmitBtnText}>
-                                        {selectedImages.length > 0
-                                            ? `${selectedImages.length}장의 사진으로 AI 기억 인터뷰 시작`
-                                            : 'AI 기억 인터뷰 시작'}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
+                            <View style={styles.actionButtonRow}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.actionSubmitBtn,
+                                        (isProcessing || selectedImages.length === 0) && styles.actionSubmitBtnDisabled,
+                                    ]}
+                                    onPress={handleStartProcess}
+                                    disabled={isProcessing || selectedImages.length === 0}
+                                >
+                                    {isProcessing ? (
+                                        <View style={styles.loadingRow}>
+                                            <ActivityIndicator color="#fff" size="small" />
+                                            <Text style={styles.actionSubmitBtnText}>{statusMessage || '분석 중...'}</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.actionSubmitBtnText}>
+                                            {activeEditingMemory
+                                                ? '기억 단서를 반영해 인터뷰 다시 만들기'
+                                                : selectedImages.length > 0
+                                                  ? `${selectedImages.length}장의 사진으로 AI 기억 인터뷰 시작`
+                                                  : 'AI 기억 인터뷰 시작'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                                {activeEditingMemory ? (
+                                    <TouchableOpacity style={styles.cancelReanalysisBtn} onPress={handleCancelReanalysis}>
+                                        <Text style={styles.cancelReanalysisBtnText}>재분석 취소</Text>
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
                         </View>
                     </View>
 
@@ -725,7 +792,6 @@ export default function IndexScreen() {
                     onClose={() => {
                         setInterviewModalVisible(false);
                         setInterviewData(null);
-                        setActiveEditingMemory(null);
                     }}
                     factsAndClues={{
                         estimatedEra: interviewData.estimatedEra,
@@ -734,11 +800,7 @@ export default function IndexScreen() {
                         memoryContext: interviewData.memoryContext,
                     }}
                     questions={interviewData.interviewQuestions}
-                    imageUrls={
-                        activeEditingMemory
-                            ? activeEditingMemory.imageUrls
-                            : selectedImages.map((image) => image.uri).filter((uri): uri is string => Boolean(uri))
-                    }
+                    imageUrls={selectedImages.map((image) => image.uri).filter((uri): uri is string => Boolean(uri))}
                     initialAnswers={initialAnswers}
                     initialExtraStory={initialExtraStory}
                     onComplete={handleInterviewComplete}
@@ -801,6 +863,25 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: memoryColors.text,
         fontFamily: memoryFontFamily,
+    },
+    reanalysisNotice: {
+        backgroundColor: memoryColors.brandLight,
+        borderWidth: 1,
+        borderColor: memoryColors.brandBorder,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 14,
+    },
+    reanalysisNoticeTitle: {
+        color: memoryColors.brandDark,
+        fontSize: 13,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    reanalysisNoticeText: {
+        color: memoryColors.textSecondary,
+        fontSize: 12,
+        lineHeight: 19,
     },
     largeDropZone: {
         minHeight: 200,
@@ -966,6 +1047,27 @@ const styles = StyleSheet.create({
         color: memoryColors.surface,
         fontWeight: '700',
         fontSize: 14,
+    },
+    actionButtonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    cancelReanalysisBtn: {
+        minHeight: 44,
+        paddingHorizontal: 18,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: memoryColors.borderStrong,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: memoryColors.surface,
+    },
+    cancelReanalysisBtnText: {
+        color: memoryColors.textSecondary,
+        fontSize: 14,
+        fontWeight: '600',
     },
     loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     albumSection: { marginTop: 2 },
